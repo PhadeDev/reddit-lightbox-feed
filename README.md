@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.6.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.6.2, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -11,7 +11,7 @@ Status: **v0.6.1, early.** Written against Reddit's page structure as measured o
 - **Icon rail.** The left menu becomes a 64px rail of icons (Home, Popular, News, Explore, then your communities, favourites first). The menu button expands it to show names. The choice is remembered.
 - **Lightbox.** Clicking a card opens the post with its threaded comments. `J` / `K` or the arrow keys move between posts, `Esc` closes, and ctrl-click opens a post in a new tab as usual. Subreddit and user names are normal links.
 - **Opening is quicker.** Hovering a card briefly pre-loads its comments.
-- **Voting.** The vote buttons press Reddit's own hidden buttons for that post. If they cannot be found the script says so instead of pretending.
+- **Voting.** Votes on cards are sent to Reddit with your signed-in session, shown at once, and undone with a message if Reddit refuses. If Reddit rejects the session token, the script fetches a fresh one and tries once more.
 - **NSFW.** Posts marked 18+ get no thumbnail or text preview on the card, and their media is hidden behind a click in the lightbox. Communities marked 18+ get a plain letter in the rail instead of their icon.
 - **Sort bar.** Best, Hot, New, Top and Rising tabs at the top centre of the feed (no Best inside communities). They are plain links to Reddit's own sort pages.
 - **Image zoom.** Clicking an image in the lightbox opens it full screen; click again for full size with scrolling. Esc closes the image first, then the post.

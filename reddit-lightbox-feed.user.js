@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.6.1
+// @version      0.6.2
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.6.1';
+  var VERSION = '0.6.2';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -819,15 +819,30 @@
 
   function postApi(path, fields) {
     var label = path.replace('/api/', '');
-    return modhash().then(function (uh) {
-      var body = new URLSearchParams();
-      Object.keys(fields).forEach(function (k) { body.set(k, fields[k]); });
-      body.set('uh', uh);
-      body.set('api_type', 'json');
-      return fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Modhash': uh }, body: body.toString() });
-    }).then(function (r) {
-      if (!r.ok) throw new Error('Reddit answered HTTP ' + r.status);
-      return r.text();
+    function once() {
+      return modhash().then(function (uh) {
+        var body = new URLSearchParams();
+        Object.keys(fields).forEach(function (k) { body.set(k, fields[k]); });
+        body.set('uh', uh);
+        body.set('api_type', 'json');
+        return fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Modhash': uh }, body: body.toString() });
+      }).then(function (r) {
+        if (!r.ok) {
+          var err = new Error(r.status === 429 ? 'Reddit says slow down (HTTP 429). Wait a few seconds and try again.' : 'Reddit answered HTTP ' + r.status);
+          err.status = r.status;
+          throw err;
+        }
+        return r.text();
+      });
+    }
+    return once().catch(function (e) {
+      if (e && (e.status === 401 || e.status === 403)) {
+        log('token may have expired, fetching a fresh one and trying once more');
+        ACT.uh = '';
+        ACT.uhP = null;
+        return once();
+      }
+      throw e;
     }).then(function (t) {
       var j = null;
       try { j = JSON.parse(t); } catch (e) { j = null; }
@@ -1349,15 +1364,20 @@
     if (!p) return;
     var cur = own.votes[id] || 0;
     var want = dir === 'up' ? 1 : -1;
-    var btn = findVoteButton(id, dir);
-    if (!btn) { toast('Voting from here is not available yet. Open the post to vote on Reddit.'); log('vote button not found', dir); return; }
-    try { btn.click(); } catch (e) { log('vote click failed:', e); return; }
-    own.votes[id] = cur === want ? 0 : want;
+    var next = cur === want ? 0 : want;
+    function show() {
+      var old = card.querySelector('.vote');
+      if (old) old.replaceWith(voteBox(p));
+      paintCard(id);
+    }
+    own.votes[id] = next;
     own.vtouched[id] = true;
-    var old = card.querySelector('.vote');
-    if (old) old.replaceWith(voteBox(p));
-    paintCard(id);
-    log('vote sent', dir);
+    show();
+    postApi('/api/vote', { id: id, dir: String(next) }).then(function () { log('vote saved', dir); }, function (e) {
+      own.votes[id] = cur;
+      show();
+      toast('Voting did not work: ' + String((e && e.message) || e));
+    });
   }
 
   function loadSaved() {
