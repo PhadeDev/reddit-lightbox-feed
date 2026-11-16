@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.7.0
+// @version      0.8.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.7.0';
+  var VERSION = '0.8.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -252,7 +252,7 @@
   ].join('\n');
 
   var LB_CSS = [
-    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--scrim:rgba(8,5,8,.72);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
+    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--gold:#F6A800;--scrim:rgba(8,5,8,.72);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
     ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#1a8f3c;--down:#c62828;--scrim:rgba(30,15,25,.55)}',
     '*{box-sizing:border-box}',
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}',
@@ -309,14 +309,30 @@
     '.pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:99px;background:var(--surface2);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;font-variant-numeric:tabular-nums}',
     'a.pill:hover,button.pill:hover{outline:1px solid var(--accent)}',
     '.pill .ic{width:15px;height:15px}',
+    '.vgrp{padding:0 2px;gap:0}',
+    '.pb{width:30px;height:26px;border-radius:99px;display:grid;place-items:center;color:var(--muted)}',
+    '.pb:hover{color:var(--fg)}',
+    '.pb.on.up,.psc.up{color:var(--up)}',
+    '.pb.on.dn,.psc.dn{color:var(--down)}',
+    '.psc{min-width:30px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}',
+    '.pbtn{cursor:pointer;color:var(--muted)}',
+    '.pbtn:hover{color:var(--fg)}',
+    '.pbtn.sv.on{color:var(--gold)}',
+    '.pbtn.sv.on .ic{fill:currentColor}',
     '.ch{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 8px;gap:8px;flex-wrap:wrap}',
     '.ch h3{margin:0;font-size:15px;font-weight:600}',
     '.ch span{font-size:12px;color:var(--muted)}',
     '.reply{display:inline-block;margin-bottom:6px;color:var(--accent);font-weight:600;font-size:13px}',
     '.cm{display:grid;grid-template-columns:16px minmax(0,1fr);gap:6px;margin-top:12px}',
     '.line{position:relative;width:16px;border-radius:4px}',
-    '.line::after{content:"";position:absolute;left:7px;top:6px;bottom:0;width:2px;background:var(--line);border-radius:2px}',
-    '.line:hover::after{background:var(--accent)}',
+    '.line::after{content:"";position:absolute;left:6px;top:6px;bottom:0;width:3px;background:var(--line);border-radius:3px}',
+    '.line:hover::after{filter:brightness(1.5)}',
+    '.cm.d0>.line::after{background:#5b9cff}',
+    '.cm.d1>.line::after{background:#ff6b6b}',
+    '.cm.d2>.line::after{background:#4fd18b}',
+    '.cm.d3>.line::after{background:#F6A800}',
+    '.cm.d4>.line::after{background:#b07cff}',
+    '.cm.d5>.line::after{background:#ff9f43}',
     '.cm.fold .line::after{display:none}',
     '.cact{display:flex;gap:2px;align-items:center;flex-wrap:wrap;margin-top:4px}',
     '.cb{height:26px;min-width:26px;padding:0 8px;border-radius:99px;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-size:12px;font-weight:500}',
@@ -738,6 +754,72 @@
     return nodes;
   }
 
+  function postActions(p, pl) {
+    var id = p.name;
+    var v0 = p.likes === true ? 1 : (p.likes === false ? -1 : 0);
+    function curV() { return own.votes[id] !== undefined ? own.votes[id] : v0; }
+    function curS() { return own.saved[id] !== undefined ? !!own.saved[id] : !!p.saved; }
+    var upB = el('button', { class: 'pb up', type: 'button', 'aria-label': 'Upvote' }, svg(IC.up));
+    var sc = el('span', { class: 'psc' });
+    var dnB = el('button', { class: 'pb dn', type: 'button', 'aria-label': 'Downvote' }, svg(IC.down));
+    var svL = el('span', { text: 'Save' });
+    var svB = el('button', { class: 'pill pbtn sv', type: 'button' }, svg(IC.save), svL);
+    var cpB = el('button', { class: 'pill pbtn', type: 'button' }, svg(IC.share), el('span', { text: 'Copy link' }));
+    var hdB = el('button', { class: 'pill pbtn', type: 'button' }, svg(IC.hide), el('span', { text: 'Hide' }));
+    var msg = el('span', { class: 'er' });
+    msg.style.display = 'none';
+    var msgT = 0;
+    function say(t) {
+      msg.textContent = t;
+      msg.style.display = '';
+      clearTimeout(msgT);
+      msgT = setTimeout(function () { msg.style.display = 'none'; }, 4500);
+    }
+    function why(e) { return String((e && e.message) || e); }
+    function paint() {
+      var v = curV();
+      upB.className = 'pb up' + (v > 0 ? ' on' : '');
+      dnB.className = 'pb dn' + (v < 0 ? ' on' : '');
+      upB.setAttribute('aria-pressed', String(v > 0));
+      dnB.setAttribute('aria-pressed', String(v < 0));
+      sc.className = 'psc' + (v > 0 ? ' up' : (v < 0 ? ' dn' : ''));
+      sc.textContent = fmt((p.score || 0) + (v - v0));
+      var sv = curS();
+      svB.className = 'pill pbtn sv' + (sv ? ' on' : '');
+      svB.setAttribute('aria-pressed', String(sv));
+      svL.textContent = sv ? 'Saved' : 'Save';
+    }
+    function cast(want) {
+      var prev = curV();
+      var next = prev === want ? 0 : want;
+      applyVote(id, next);
+      paint();
+      postApi('/api/vote', { id: id, dir: String(next) }).catch(function (e) { applyVote(id, prev); paint(); say('Voting did not work: ' + why(e)); });
+    }
+    upB.addEventListener('click', function () { cast(1); });
+    dnB.addEventListener('click', function () { cast(-1); });
+    svB.addEventListener('click', function () {
+      var prev = curS();
+      applySaved(id, !prev);
+      paint();
+      postApi(prev ? '/api/unsave' : '/api/save', { id: id }).catch(function (e) { applySaved(id, prev); paint(); say('Saving did not work: ' + why(e)); });
+    });
+    cpB.addEventListener('click', function () {
+      var url = location.origin + (p.permalink || pl);
+      if (!gm.copy(url) && navigator.clipboard) navigator.clipboard.writeText(url).catch(function () { /* ignore */ });
+      say('Link copied');
+    });
+    hdB.addEventListener('click', function () {
+      own.hid[id] = true;
+      paintCard(id);
+      postApi('/api/hide', { id: id }).then(function () {
+        if (S.idx >= 0 && S.idx < S.list.length - 1) step(1); else close();
+      }, function (e) { own.hid[id] = false; paintCard(id); say('Hiding did not work: ' + why(e)); });
+    });
+    paint();
+    return el('div', { class: 'acts' }, el('span', { class: 'pill vgrp' }, upB, sc, dnB), svB, cpB, hdB, msg);
+  }
+
   function renderPost(d, pl) {
     var p = d.post;
     var link = location.origin + (p.permalink || pl);
@@ -755,9 +837,7 @@
       el('h2', { text: p.title || '' }),
       chips.length ? el('div', { class: 'chips' }, chips) : null,
       postBody(p),
-      el('div', { class: 'acts' },
-        el('span', { class: 'pill' }, svg(IC.up), fmt(p.score) + ' points'),
-        el('span', { class: 'pill' }, svg(IC.comment), fmt(p.num_comments) + ' comments'))
+      postActions(p, pl)
     );
     var thread = el('div', { class: 'thread' });
     d.comments.forEach(function (c) { var n = commentNode(c, pl); if (n) thread.appendChild(n); });
@@ -962,7 +1042,7 @@
     rpB.addEventListener('click', function () {
       if (openC && openC.box.parentNode) { openC.ta.focus(); return; }
       openC = composer(d.name, pl, function (nd) {
-        var n = commentNode({ kind: 't1', data: newComment(nd) }, pl);
+        var n = commentNode({ kind: 't1', data: newComment(nd) }, pl, (slot.depth || 0) + 1);
         if (n) prepend(slot.kids, n);
       }, 'Reply to u/' + (d.author || 'this comment'));
       slot.cslot.appendChild(openC.box);
@@ -972,7 +1052,8 @@
     return el('div', { class: 'cact' }, upB, pts, dnB, svB, rpB, msg);
   }
 
-  function commentNode(c, pl) {
+  function commentNode(c, pl, depth) {
+    depth = depth || 0;
     if (!c) return null;
     if (c.kind === 'more') {
       var n = (c.data && c.data.count) || 0;
@@ -981,7 +1062,7 @@
     }
     if (c.kind !== 't1' || !c.data) return null;
     var d = c.data;
-    var wrap = el('div', { class: 'cm' });
+    var wrap = el('div', { class: 'cm d' + (depth % 6) });
     var line = el('button', { class: 'line', type: 'button', 'aria-label': 'Collapse or expand this thread' });
     line.addEventListener('click', function () { wrap.classList.toggle('fold'); });
     var head = el('div', { class: 'chead' }, userLink(d.author),
@@ -991,10 +1072,10 @@
       dot(), el('span', { text: ago(d.created_utc) }), (d.archived || !d.name) ? dot() : null, (d.archived || !d.name) ? el('span', { text: fmt(d.score) + ' points' }) : null);
     var kids = el('div', { class: 'kids' });
     var replies = d.replies && d.replies.data && d.replies.data.children;
-    if (replies) replies.forEach(function (r) { var k = commentNode(r, pl); if (k) kids.appendChild(k); });
+    if (replies) replies.forEach(function (r) { var k = commentNode(r, pl, depth + 1); if (k) kids.appendChild(k); });
     wrap.appendChild(line);
     var cslot = el('div', { class: 'cslot' });
-    var acts = (d.archived || !d.name) ? null : commentActions(d, pl, { kids: kids, cslot: cslot });
+    var acts = (d.archived || !d.name) ? null : commentActions(d, pl, { kids: kids, cslot: cslot, depth: depth });
     wrap.appendChild(el('div', {}, head, el('div', { class: 'ctext' }, htmlToNodes(d.body_html)), acts, cslot, kids));
     return wrap;
   }
@@ -1376,25 +1457,31 @@
     });
   }
 
-  function vote(id, dir, card) {
-    var p = own.posts.get(id);
-    if (!p) return;
+  function applyVote(id, v) {
+    own.votes[id] = v;
+    own.vtouched[id] = true;
+    var c = cardOf(id), p = own.posts.get(id);
+    var old = c && c.querySelector('.vote');
+    if (old && p) old.replaceWith(voteBox(p));
+    paintCard(id);
+    syncVote(id);
+  }
+
+  function applySaved(id, on) {
+    own.saved[id] = on;
+    own.touched[id] = true;
+    paintCard(id);
+    syncSaved(id);
+  }
+
+  function vote(id, dir) {
+    if (!own.posts.get(id)) return;
     var cur = own.votes[id] || 0;
     var want = dir === 'up' ? 1 : -1;
     var next = cur === want ? 0 : want;
-    function show() {
-      var old = card.querySelector('.vote');
-      if (old) old.replaceWith(voteBox(p));
-      paintCard(id);
-    }
-    own.votes[id] = next;
-    own.vtouched[id] = true;
-    show();
-    syncVote(id);
+    applyVote(id, next);
     postApi('/api/vote', { id: id, dir: String(next) }).then(function () { log('vote saved', dir); }, function (e) {
-      own.votes[id] = cur;
-      show();
-      syncVote(id);
+      applyVote(id, cur);
       toast('Voting did not work: ' + String((e && e.message) || e));
     });
   }
@@ -2567,7 +2654,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, postActions: postActions, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
