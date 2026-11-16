@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.6.2
+// @version      0.6.3
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.6.2';
+  var VERSION = '0.6.3';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -218,8 +218,7 @@
     'html.lbx-own shreddit-feed { display: block !important; }',
     'html.lbx-own shreddit-feed > *:not(faceplate-partial[slot="load-after"]) { display: none !important; }',
     'html.lbx-own shreddit-feed > faceplate-partial[slot="load-after"] { display: block !important; min-height: 4px; }',
-    'html.lbx-own.lbx-comm #subgrid-container:has(shreddit-feed) > div:first-child { position: relative; }',
-    'html.lbx-own.lbx-comm #subgrid-container:has(shreddit-feed) > div:first-child::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 56%; z-index: 2; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,0) 30%, var(--color-neutral-background, #0e1113) 100%); }',
+    'html.lbx-own.lbx-comm #subreddit-banner-img { -webkit-mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,0) 100%); mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,0) 100%); border-radius: 0 !important; }',
     'html.lbx-own.lbx-sugg div:has(> shreddit-feed) { display: flex !important; flex-direction: column; }',
     'html.lbx-own.lbx-sugg shreddit-feed { display: contents !important; }',
     'html.lbx-own.lbx-sugg #lbx-feed-host { order: 1; }',
@@ -841,6 +840,10 @@
         ACT.uh = '';
         ACT.uhP = null;
         return once();
+      }
+      if (e && e.status >= 500 && path !== '/api/comment') {
+        log('Reddit server error ' + e.status + ', trying once more');
+        return new Promise(function (res) { setTimeout(res, 700); }).then(once);
       }
       throw e;
     }).then(function (t) {

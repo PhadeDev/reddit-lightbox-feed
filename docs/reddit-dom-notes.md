@@ -67,3 +67,9 @@ Right-hand controls: `#advertise-button`, `#header-action-item-chat-button`, `#c
 - `/subreddits/mine/subscriber.json` worked: 203 communities loaded for the rail.
 - With the rail on, the grid became `64px 2986px` and the feed spanned the full width, so the grid overrides work.
 - Whether a post carries an NSFW attribute is unconfirmed; "Copy diagnostics" now lists the first post's attribute names.
+
+## Community header, measured 16/11/2026
+
+- First div in `#subgrid-container` (about 200px high) holds `div#subreddit-banner-img` (192px high, full width) and a `section` with the avatar and title (88px, starts about 36px above the banner bottom) plus `create-post-entry-point-wrapper` and `shreddit-subreddit-header-buttons`.
+- The script fades the banner with a CSS mask on `#subreddit-banner-img` (community pages only).
+- `/api/save` answered HTTP 500 once from the page; save-type actions now retry once after a short wait.
