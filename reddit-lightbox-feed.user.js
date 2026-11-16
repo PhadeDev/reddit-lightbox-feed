@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.4.0
+// @version      0.5.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.4.0';
+  var VERSION = '0.5.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -1000,6 +1000,8 @@
     '.flairs{display:flex;gap:6px;flex-wrap:wrap}',
     '.chip{font-size:11px;font-weight:500;padding:1px 8px;border-radius:99px;background:var(--accent-bg);color:var(--fg)}',
     '.chip.nsfw{background:#8E1537;color:#fff}',
+    'a.chip.fl{text-decoration:none;color:var(--fg)}',
+    'a.chip.fl:hover{outline:1px solid var(--accent)}',
     '.snip{margin:0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}',
     '.nothumb .snip{-webkit-line-clamp:5}',
     '.acts{display:flex;align-items:center;gap:4px;margin-top:auto;padding-top:6px;flex-wrap:wrap}',
@@ -1027,6 +1029,28 @@
     '.pmenu{position:fixed;z-index:40;width:220px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.45);padding:6px;flex-direction:column}',
     '.mi{display:block;width:100%;text-align:left;padding:8px 12px;border-radius:6px;color:var(--fg);text-decoration:none;font-size:13px;cursor:pointer;background:none;border:0;font:inherit}',
     '.mi:hover{background:var(--surface2)}',
+    '.bl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-self:start}',
+    '.fchip{display:inline-flex;align-items:center;text-decoration:none;color:var(--fg);border-color:var(--accent);background:var(--accent-bg)}',
+    '.about{position:fixed;top:56px;right:0;bottom:0;z-index:35;width:min(420px,100vw);background:var(--surface);color:var(--fg);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(0,0,0,.4);overflow:auto;outline:none}',
+    '.ab-head{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line);z-index:1}',
+    '.ab-body{padding:14px 16px 28px;display:flex;flex-direction:column;gap:10px}',
+    '.ab-body h2{margin:0;font-size:20px}',
+    '.ab-body h3{margin:10px 0 0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}',
+    '.ab-t{font-weight:600}',
+    '.ab-s{color:var(--muted);font-size:13px}',
+    '.ab-d{margin:0}',
+    '.bm{display:block;padding:9px 14px;border:1px solid var(--line);border-radius:99px;color:var(--fg);text-decoration:none;text-align:center;font-weight:600;font-size:13px}',
+    '.bm:hover{border-color:var(--accent)}',
+    '.rule{border-bottom:1px solid var(--line)}',
+    '.rh{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:10px 2px;font-weight:600;font-size:14px}',
+    '.rn{color:var(--muted);min-width:18px}',
+    '.rb{display:none;padding:0 2px 12px 30px;color:var(--muted);font-size:13px;overflow-wrap:anywhere}',
+    '.rule.open .rb{display:block}',
+    '.ab-h{font-size:13px;color:var(--muted);overflow-wrap:anywhere}',
+    '.ab-h a,.rb a{color:var(--accent)}',
+    '.ab-m{display:flex;flex-direction:column;gap:8px;align-items:flex-start}',
+    '.err{color:#ff9a9a}',
+    '.skel{height:14px;border-radius:6px;background:var(--surface2)}',
     '.bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:0 0 10px}',
     '.bar .sg{justify-self:end}',
     '.sorts{display:inline-flex;gap:2px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:99px}',
@@ -1168,6 +1192,28 @@
     return !!(fl && /^\s*nsfw\s*$/i.test(fl.textContent || ''));
   }
 
+  function flairHrefOf(fl) {
+    var a = fl && fl.querySelector ? fl.querySelector('a') : null;
+    var h = a && a.getAttribute('href');
+    if (!h || !/flair_name/.test(h)) return '';
+    try {
+      var u = new URL(h, location.origin);
+      return u.origin === location.origin ? u.pathname + u.search : '';
+    } catch (e) { return ''; }
+  }
+
+  function flairHref(p) {
+    if (p.flair_href) return p.flair_href;
+    if (!p.subreddit || !p.link_flair_text) return '';
+    return '/r/' + encodeURIComponent(p.subreddit) + '/?f=' + encodeURIComponent('flair_name:"' + p.link_flair_text + '"');
+  }
+
+  function flairChip(p) {
+    var h = flairHref(p);
+    return h ? el('a', { class: 'chip fl', href: h, title: 'Show only posts with this flair', text: p.link_flair_text })
+      : el('span', { class: 'chip', text: p.link_flair_text });
+  }
+
   function domPost(e) {
     var id = e.getAttribute('id') || '';
     var pl = e.getAttribute('permalink') || '';
@@ -1185,6 +1231,7 @@
       name: id, title: title, subreddit: sub, author: e.getAttribute('author') || '', permalink: pl,
       score: attrNum(e, 'score'), num_comments: attrNum(e, 'comment-count'), created_utc: created,
       link_flair_text: fl ? String(fl.textContent || '').replace(/\s+/g, ' ').trim() : '',
+      flair_href: flairHrefOf(fl),
       over_18: nsfw, spoiler: e.hasAttribute('spoiler'), stickied: false, likes: null,
       is_self: type === 'text', is_video: type === 'video', is_gallery: type === 'gallery',
       domain: e.getAttribute('domain') || '', url: e.getAttribute('content-href') || '',
@@ -1196,7 +1243,7 @@
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', preT: 0, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -1241,7 +1288,7 @@
       media = el('div', { class: 'thumb' }, inner, badge ? el('span', { class: 'badge', text: badge }) : null);
     }
     var chips = [];
-    if (p.link_flair_text) chips.push(el('span', { class: 'chip', text: p.link_flair_text }));
+    if (p.link_flair_text) chips.push(flairChip(p));
     if (nsfw) chips.push(el('span', { class: 'chip nsfw', text: 'NSFW' }));
     if (p.stickied) chips.push(el('span', { class: 'chip', text: 'Pinned' }));
     var av = el('span', { class: 'av', text: (p.subreddit || '?').charAt(0).toUpperCase() });
@@ -1421,7 +1468,7 @@
   function onOwnClick(e) {
     var t = e.target;
     if (!t || !t.closest) return;
-    if (own.menu && !t.closest('.pmenu') && !t.closest('[data-act="more"]')) closeMenu();
+    if (own.menu && !t.closest('.pmenu') && !t.closest('[data-act="more"]') && !t.closest('.bl')) closeMenu();
     var card = t.closest('.card');
     if (!card) return;
     var id = card.getAttribute('data-id');
@@ -1439,6 +1486,7 @@
     if (own.hid[id]) return;
     if (t.closest('a.sub')) return;
     if (t.closest('a.usr')) return;
+    if (t.closest('a.fl')) return;
     if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     openOwn(id);
@@ -1446,6 +1494,7 @@
 
   function onOwnKey(e) {
     if (e.key === 'Escape' && own.menu && own.menu.style.display !== 'none') { e.preventDefault(); closeMenu(); return; }
+    if (e.key === 'Escape' && own.about && own.about.style.display !== 'none') { e.preventDefault(); closeAbout(); return; }
     if ((e.key === 'Enter') && e.target && e.target.classList && e.target.classList.contains('card')) {
       e.preventDefault();
       openOwn(e.target.getAttribute('data-id'));
@@ -1511,9 +1560,17 @@
   function updateSort() {
     if (!own.sorts) return;
     var info = sortInfo(location.pathname);
-    var key = info ? info.sub + '|' + info.cur : '';
+    var key = (info ? info.sub + '|' + info.cur : '') + '|' + (location.search || '');
     if (key === own.sortKey) return;
     own.sortKey = key;
+    own.sub = info ? info.sub : '';
+    var showLeft = !!own.sub && !/^(popular|all|home)$/i.test(own.sub);
+    if (own.left) own.left.style.display = showLeft ? '' : 'none';
+    var fl = showLeft ? currentFlair() : '';
+    if (own.fchip) {
+      own.fchip.style.display = fl ? '' : 'none';
+      if (fl) { own.fchip.setAttribute('href', location.pathname); own.fchip.setAttribute('title', 'Clear the flair filter'); own.fchip.textContent = 'Flair: ' + fl.trim() + '  ✕'; }
+    }
     if (!info) { own.sorts.style.display = 'none'; return; }
     own.sorts.style.display = '';
     var base = info.sub ? '/r/' + info.sub + '/' : '/';
@@ -1525,6 +1582,175 @@
       return a;
     });
     setKids.apply(null, [own.sorts].concat(links));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Community details: about, rules, bookmarks and flair filter         */
+  /* ------------------------------------------------------------------ */
+
+  var SUBI = {}, FLI = {};
+
+  function getJson(url) {
+    return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function subData(sub) {
+    var k = sub.toLowerCase();
+    if (!SUBI[k]) {
+      var b = '/r/' + encodeURIComponent(sub);
+      var soft = function (u) { return getJson(u).catch(function () { return null; }); };
+      SUBI[k] = Promise.all([soft(b + '/about.json?raw_json=1'), soft(b + '/about/rules.json?raw_json=1'), soft(b + '/api/widgets?raw_json=1')]).then(function (a) {
+        return { about: a[0] && a[0].data, rules: a[1] && a[1].rules, widgets: a[2] };
+      });
+    }
+    return SUBI[k];
+  }
+
+  function flairList(sub) {
+    var k = sub.toLowerCase();
+    if (!FLI[k]) {
+      FLI[k] = getJson('/r/' + encodeURIComponent(sub) + '/api/link_flair_v2.json').then(function (l) {
+        return (Array.isArray(l) ? l : []).filter(function (x) { return x && x.text; }).map(function (x) { return String(x.text); });
+      }).catch(function () { return []; });
+    }
+    return FLI[k];
+  }
+
+  function widgetBlocks(w) {
+    var out = [];
+    if (!w || !w.items) return out;
+    var order = [].concat((w.layout && w.layout.topbar && w.layout.topbar.order) || [], (w.layout && w.layout.sidebar && w.layout.sidebar.order) || []);
+    if (!order.length) order = Object.keys(w.items);
+    function link(x) {
+      var u = x && safeHref(x.url);
+      return u && x.text ? { text: String(x.text), url: u } : null;
+    }
+    order.forEach(function (id) {
+      var it = w.items[id];
+      if (!it) return;
+      var links = [];
+      if (it.kind === 'button') (it.buttons || []).forEach(function (b) { var l = link(b); if (l) links.push(l); });
+      else if (it.kind === 'menu') (it.data || []).forEach(function (m) {
+        if (m && m.children) m.children.forEach(function (c) { var l = link(c); if (l) links.push(l); });
+        else { var l2 = link(m); if (l2) links.push(l2); }
+      });
+      if (links.length) out.push({ title: it.shortName || 'Community bookmarks', links: links });
+      else if (it.kind === 'text-area' && it.textHtml) out.push({ title: it.shortName || '', html: it.textHtml });
+    });
+    return out;
+  }
+
+  function currentFlair() {
+    try {
+      var f = new URLSearchParams(location.search || '').get('f');
+      var m = f && /^flair_name:"([\s\S]*)"$/.exec(f);
+      return m ? m[1] : '';
+    } catch (e) { return ''; }
+  }
+
+  function ensureAbout() {
+    if (own.about) return;
+    own.aboutBody = el('div', { class: 'ab-body' });
+    own.aboutX = el('button', { class: 'ib2', type: 'button', 'aria-label': 'Close details', onclick: function () { closeAbout(); } }, svg(IC.x));
+    own.about = el('aside', { class: 'about', role: 'dialog', 'aria-label': 'Community details', tabindex: '-1' },
+      el('div', { class: 'ab-head' }, el('b', { text: 'About this community' }), own.aboutX), own.aboutBody);
+    own.about.style.display = 'none';
+    own.root.appendChild(own.about);
+  }
+
+  function closeAbout() {
+    if (own.about) own.about.style.display = 'none';
+  }
+
+  function openAbout(sub) {
+    ensureAbout();
+    if (own.about.style.display !== 'none' && own.aboutSub === sub) { closeAbout(); return; }
+    own.aboutSub = sub;
+    own.about.style.display = 'block';
+    setKids(own.aboutBody, el('div', { class: 'skel', style: 'width:60%' }), el('div', { class: 'skel' }), el('div', { class: 'skel', style: 'width:80%' }));
+    if (own.about.focus) own.about.focus({ preventScroll: true });
+    subData(sub).then(function (d) {
+      if (own.aboutSub !== sub) return;
+      var a = d.about || {};
+      var kids = [];
+      kids.push(el('h2', { text: 'r/' + (a.display_name || sub) }));
+      if (a.title && a.title !== a.display_name) kids.push(el('div', { class: 'ab-t', text: a.title }));
+      var stats = [];
+      if (a.subscribers != null) stats.push(fmt(a.subscribers) + ' members');
+      var online = a.active_user_count != null ? a.active_user_count : a.accounts_active;
+      if (online != null) stats.push(fmt(online) + ' online');
+      if (a.created_utc) stats.push('Created ' + new Date(a.created_utc * 1000).toLocaleDateString('en-GB'));
+      if (a.over18) stats.push('18+');
+      if (stats.length) kids.push(el('div', { class: 'ab-s', text: stats.join(' · ') }));
+      if (a.public_description) kids.push(el('p', { class: 'ab-d', text: a.public_description }));
+      widgetBlocks(d.widgets).forEach(function (b) {
+        kids.push(el('h3', { text: b.title || 'More' }));
+        if (b.links) b.links.forEach(function (l) { kids.push(el('a', { class: 'bm', href: l.url, target: '_blank', rel: 'noopener noreferrer', text: l.text })); });
+        else kids.push(el('div', { class: 'ab-h' }, htmlToNodes(b.html)));
+      });
+      var rules = d.rules || [];
+      if (rules.length) {
+        kids.push(el('h3', { text: 'Rules' }));
+        rules.forEach(function (r, i) {
+          var body = el('div', { class: 'rb' }, htmlToNodes(r.description_html || ''));
+          var head = el('button', { class: 'rh', type: 'button', 'aria-expanded': 'false' }, el('span', { class: 'rn', text: String(i + 1) }), el('span', { text: r.short_name || 'Rule ' + (i + 1) }));
+          var box = el('div', { class: 'rule' }, head, body);
+          head.addEventListener('click', function () {
+            var on = !box.classList.contains('open');
+            box.classList.toggle('open', on);
+            head.setAttribute('aria-expanded', String(on));
+          });
+          kids.push(box);
+        });
+      }
+      if (a.description_html) {
+        var more = el('div', { class: 'ab-h' }, htmlToNodes(a.description_html));
+        more.style.display = 'none';
+        var mb = el('button', { class: 'sg', type: 'button', text: 'Show full sidebar text' });
+        mb.addEventListener('click', function () { var on = more.style.display === 'none'; more.style.display = on ? '' : 'none'; mb.textContent = on ? 'Hide full sidebar text' : 'Show full sidebar text'; });
+        kids.push(el('div', { class: 'ab-m' }, mb, more));
+      }
+      if (!d.about && !d.rules) kids.push(el('div', { class: 'err', text: 'Reddit would not give the details for this community here.' }));
+      kids.push(el('a', { class: 'bm', href: '/r/' + encodeURIComponent(sub) + '/about/', text: 'Open the full community page on Reddit' }));
+      setKids(own.aboutBody, kids);
+    });
+  }
+
+  function openFlairs(sub, btn) {
+    if (!own.menu) {
+      own.menu = el('div', { class: 'pmenu', role: 'menu' });
+      own.menu.style.display = 'none';
+      own.root.appendChild(own.menu);
+    }
+    if (own.menuId === 'flairs' && own.menu.style.display !== 'none') { closeMenu(); return; }
+    own.menuId = 'flairs';
+    setKids(own.menu, el('div', { class: 'mi', text: 'Loading flairs...' }));
+    var r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 20, bottom: 80, top: 60 };
+    own.menu.style.display = 'flex';
+    own.menu.style.left = Math.max(8, Math.round(r.left)) + 'px';
+    own.menu.style.top = Math.round(r.bottom + 4) + 'px';
+    flairList(sub).then(function (names) {
+      if (own.menuId !== 'flairs') return;
+      var seen = {};
+      own.shown.forEach(function (id) {
+        var p = own.posts.get(id);
+        if (p && p.link_flair_text && String(p.subreddit).toLowerCase() === sub.toLowerCase()) seen[p.link_flair_text.trim()] = flairHref(p);
+      });
+      var items = names.map(function (t) {
+        return { text: t.trim(), href: seen[t.trim()] || ('/r/' + encodeURIComponent(sub) + '/?f=' + encodeURIComponent('flair_name:"' + t + '"')) };
+      });
+      Object.keys(seen).forEach(function (t) { if (!items.some(function (x) { return x.text === t; })) items.push({ text: t, href: seen[t] }); });
+      var kids = [];
+      if (currentFlair()) kids.push(el('a', { class: 'mi', role: 'menuitem', href: location.pathname, text: 'Clear the flair filter' }));
+      items.forEach(function (x) { kids.push(el('a', { class: 'mi', role: 'menuitem', href: x.href, text: x.text })); });
+      if (!items.length) kids.push(el('div', { class: 'mi', text: 'No flairs found for this community.' }));
+      setKids(own.menu, kids);
+      own.menu.style.maxHeight = '60vh';
+      own.menu.style.overflowY = 'auto';
+    });
   }
 
   function toggleSugg() {
@@ -1545,7 +1771,14 @@
       own.toastEl.style.display = 'none';
       own.sg = el('button', { class: 'sg', type: 'button', 'aria-pressed': 'false', text: 'Suggested communities' });
       own.sorts = el('nav', { class: 'sorts', 'aria-label': 'Sort posts' });
-      own.bar = el('div', { class: 'bar' }, el('span'), own.sorts, own.sg);
+      own.aboutB = el('button', { class: 'sg', type: 'button', text: 'About and rules' });
+      own.flairB = el('button', { class: 'sg', type: 'button', 'aria-haspopup': 'menu', text: 'Flairs' });
+      own.fchip = el('a', { class: 'sg fchip' });
+      own.fchip.style.display = 'none';
+      own.aboutB.addEventListener('click', function () { if (own.sub) openAbout(own.sub); });
+      own.flairB.addEventListener('click', function () { if (own.sub) openFlairs(own.sub, own.flairB); });
+      own.left = el('div', { class: 'bl' }, own.aboutB, own.flairB, own.fchip);
+      own.bar = el('div', { class: 'bar' }, own.left, own.sorts, own.sg);
       own.sg.addEventListener('click', toggleSugg);
       own.root.appendChild(own.bar);
       own.root.appendChild(own.grid);
@@ -2130,7 +2363,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }

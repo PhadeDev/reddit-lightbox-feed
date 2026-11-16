@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.4.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.5.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -18,6 +18,7 @@ Status: **v0.4.0, early.** Written against Reddit's page structure as measured o
 - **User hover card.** Hover (or tab to) a username on a card or in the lightbox for account age and karma, a **Start chat** link to Reddit's chat, and a link to their profile where Reddit's own Follow button is. Chat opens in a new tab.
 - **Save, Hide and the "..." menu on every card.** Hide keeps the card in its place as a greyed placeholder with Undo, so nothing moves. The menu has Save, Hide, Follow post, Copy link, Open on Reddit and Report (opens the post on Reddit). These use Reddit's own `/api/` endpoints with your signed-in session; if Reddit refuses, the change is undone and the reason is shown.
 - **Comments in the lightbox.** Upvote, downvote, save and reply on any comment, plus an Add a comment box for the post. Replies are posted as you through Reddit.
+- **Community details.** On a community page, **About and rules** opens a side panel with the description, members, created date, community bookmarks, the rules (click to expand) and the full sidebar text. **Flairs** lists the community's flairs, and flair chips on cards are links that filter the feed with Reddit's own `?f=flair_name:"..."` address. An active filter shows as a chip you can click to clear.
 - **Suggested communities.** Hidden by default; a small "Suggested communities" button above the cards shows or hides the strip.
 - **Safe fallback.** If the cards cannot be drawn, the script goes back to showing Reddit's own cards in a plain grid and says why in the diagnostics.
 
@@ -42,7 +43,7 @@ Click the userscript manager's icon while on Reddit to see the script's menu:
 
 ## Privacy
 
-Nothing is sent anywhere except to Reddit itself. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: optional extra post details (`/by_id/`, `/api/info`; Reddit currently refuses these, and cards do not need them), a post's comments (`<post>.json`), your community list (`/subreddits/mine/subscriber.json`), and the account age and karma of a user you hover (`/user/NAME/about.json`). It stores only its on/off settings and whether the rail is expanded.
+Nothing is sent anywhere except to Reddit itself. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: optional extra post details (`/by_id/`, `/api/info`; Reddit currently refuses these, and cards do not need them), a post's comments (`<post>.json`), your community list (`/subreddits/mine/subscriber.json`), the account age and karma of a user you hover (`/user/NAME/about.json`), and for a community page its `about.json`, `about/rules.json`, `api/widgets` and `api/link_flair_v2.json`. It stores only its on/off settings and whether the rail is expanded.
 
 ## Layout of this repository
 
