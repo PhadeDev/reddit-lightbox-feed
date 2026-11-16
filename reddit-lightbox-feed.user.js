@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.9.0
+// @version      0.10.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.9.0';
+  var VERSION = '0.10.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -219,6 +219,7 @@
     'html.lbx-own shreddit-feed { display: block !important; }',
     'html.lbx-own shreddit-feed > *:not(faceplate-partial[slot="load-after"]) { display: none !important; }',
     'html.lbx-own shreddit-feed > faceplate-partial[slot="load-after"] { display: block !important; min-height: 4px; }',
+    'html.lbx-own.lbx-sorts shreddit-sort-dropdown { display: none !important; }',
     'html.lbx-own.lbx-comm create-post-entry-point-wrapper, html.lbx-own.lbx-comm shreddit-subreddit-header-buttons { display: none !important; }',
     'html.lbx-own.lbx-comm #subreddit-banner-img { -webkit-mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,0) 100%); mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,0) 100%); border-radius: 0 !important; }',
     'html.lbx-own.lbx-sugg div:has(> shreddit-feed) { display: flex !important; flex-direction: column; }',
@@ -1175,6 +1176,9 @@
     '.skel{height:14px;border-radius:6px;background:var(--surface2)}',
     '.bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:0 0 10px}',
     '.bar .sg{justify-self:end}',
+    '.ctr{display:flex;flex-direction:column;align-items:center;gap:8px}',
+    '.times{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:2px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:99px}',
+    '.so.sm{padding:3px 12px;font-size:12px}',
     '.sorts{display:inline-flex;gap:2px;padding:3px;background:var(--surface);border:1px solid var(--accent);border-radius:99px}',
     '.so{padding:4px 16px;border-radius:99px;color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}',
     '.so:hover{color:var(--fg)}',
@@ -1186,9 +1190,9 @@
     '.sg.join.on{background:transparent;color:var(--fg)}',
     '.mi.dis{color:var(--muted);cursor:default}',
     '.mi.dis:hover{background:none}',
-    '.rowsep{grid-column:1/-1;height:16px;position:relative;pointer-events:none}',
-    '.rowsep::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:linear-gradient(to right,var(--accent),rgba(0,0,0,0) 85%);opacity:.55}',
-    '.rowsep::after{content:"\\203A \\203A \\203A";position:absolute;left:0;top:50%;transform:translateY(-50%);padding:0 10px 0 2px;background:var(--color-neutral-background,#0e1113);color:var(--accent);opacity:.8;font-size:12px;letter-spacing:2px}',
+    '.rowsep{grid-column:1/-1;height:24px;position:relative;pointer-events:none}',
+    '.rowsep::before{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2244%22 height=%2220%22 viewBox=%220 0 44 20%22%3E%3Cpath d=%22M17 4l8 6-8 6%22 fill=%22none%22 stroke=%22%23e0a3c8%22 stroke-width=%222.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E"),linear-gradient(to right,#e0a3c8,rgba(224,163,200,0));background-repeat:repeat-x,no-repeat;background-size:44px 20px,100% 1px;background-position:left center,left center;-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,.95),rgba(0,0,0,0) 96%);mask-image:linear-gradient(to right,rgba(0,0,0,.95),rgba(0,0,0,0) 96%)}',
+    ':host([data-theme="light"]) .rowsep::before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2244%22 height=%2220%22 viewBox=%220 0 44 20%22%3E%3Cpath d=%22M17 4l8 6-8 6%22 fill=%22none%22 stroke=%22%23532A45%22 stroke-width=%222.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E"),linear-gradient(to right,#532A45,rgba(83,42,69,0))}',
     '.sg.cta{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}',
     '.sg.cta:hover{filter:brightness(1.1);background:var(--gold);color:var(--gold-ink)}',
     '.sentinel{height:2px}',
@@ -1375,7 +1379,7 @@
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', joinB: null, joinL: null, moreB: null, subSt: null, rowT: 0, rowW: 0, ro: null, sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, vtouched: {}, voteMap: null, votesP: null, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', times: null, center: null, joinB: null, joinL: null, moreB: null, subSt: null, rowT: 0, rowW: 0, ro: null, sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, vtouched: {}, voteMap: null, votesP: null, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -1840,10 +1844,45 @@
     return m ? { sub: m[1] || '', cur: String(m[2] || '').toLowerCase() } : null;
   }
 
+  var TIMES = [['hour', 'Now'], ['day', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['year', 'This Year'], ['all', 'All Time']];
+
+  /* The page's current sort when the address has none (your default sort).
+     Read from Reddit's own more-posts address, then the sort dropdown. */
+  function detectSort() {
+    var p = document.querySelector('shreddit-feed faceplate-partial[slot="load-after"]');
+    var src = String((p && p.getAttribute('src')) || '').split('?')[0];
+    var m = /\/(best|hot|new|top|rising)\/?$/i.exec(src);
+    if (m) return m[1].toLowerCase();
+    var dd = document.querySelector('shreddit-sort-dropdown');
+    if (dd) {
+      var names = ['selected-sort', 'sort', 'value', 'selected'];
+      for (var i = 0; i < names.length; i++) {
+        var v = String(dd.getAttribute(names[i]) || '').trim();
+        if (/^(best|hot|new|top|rising)$/i.test(v)) return v.toLowerCase();
+      }
+      var tx = String(dd.textContent || '').replace(/\s+/g, ' ').trim();
+      if (/^(best|hot|new|top|rising)$/i.test(tx)) return tx.toLowerCase();
+    }
+    return '';
+  }
+
+  function detectTime() {
+    try {
+      var t = new URLSearchParams(location.search || '').get('t');
+      if (t) return t;
+    } catch (e) { /* ignore */ }
+    var p = document.querySelector('shreddit-feed faceplate-partial[slot="load-after"]');
+    var m = /[?&]t=(hour|day|week|month|year|all)/i.exec(String((p && p.getAttribute('src')) || ''));
+    return m ? m[1].toLowerCase() : 'day';
+  }
+
   function updateSort() {
     if (!own.sorts) return;
     var info = sortInfo(location.pathname);
-    var key = (info ? info.sub + '|' + info.cur : '') + '|' + (location.search || '');
+    var det = info && !info.cur ? detectSort() : '';
+    var curSort = info ? (info.cur || det || (info.sub ? '' : 'best')) : '';
+    var tm = curSort === 'top' ? detectTime() : '';
+    var key = (info ? info.sub + '|' + info.cur : '') + '|' + (location.search || '') + '|' + curSort + '|' + tm;
     if (key === own.sortKey) return;
     own.sortKey = key;
     own.sub = info ? info.sub : '';
@@ -1861,10 +1900,11 @@
       own.fchip.style.display = fl ? '' : 'none';
       if (fl) { own.fchip.setAttribute('href', location.pathname); own.fchip.setAttribute('title', 'Clear the flair filter'); own.fchip.textContent = 'Flair: ' + fl.trim() + '  ✕'; }
     }
-    if (!info) { own.sorts.style.display = 'none'; return; }
+    docEl().classList.toggle('lbx-sorts', !!info);
+    if (!info) { own.sorts.style.display = 'none'; if (own.times) own.times.style.display = 'none'; return; }
     own.sorts.style.display = '';
     var base = info.sub ? '/r/' + info.sub + '/' : '/';
-    var cur = info.cur || (info.sub ? '' : 'best');
+    var cur = curSort;
     var links = SORTS.filter(function (x) { return !(info.sub && x[0] === 'best'); }).map(function (x) {
       var on = cur === x[0];
       var a = el('a', { class: 'so' + (on ? ' on' : ''), href: (x[0] === 'best' && !info.sub) ? '/' : base + x[0] + '/', text: x[1] });
@@ -1872,6 +1912,17 @@
       return a;
     });
     setKids.apply(null, [own.sorts].concat(links));
+    if (own.times) {
+      own.times.style.display = cur === 'top' ? '' : 'none';
+      if (cur === 'top') {
+        setKids.apply(null, [own.times].concat(TIMES.map(function (x) {
+          var on = tm === x[0];
+          var a = el('a', { class: 'so sm' + (on ? ' on' : ''), href: base + 'top/?t=' + x[0], text: x[1] });
+          if (on) a.setAttribute('aria-current', 'true');
+          return a;
+        })));
+      }
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -2229,6 +2280,9 @@
       own.toastEl.style.display = 'none';
       own.sg = el('button', { class: 'sg', type: 'button', 'aria-pressed': 'false', text: 'Suggested communities' });
       own.sorts = el('nav', { class: 'sorts', 'aria-label': 'Sort posts' });
+      own.times = el('nav', { class: 'times', 'aria-label': 'Time range for top posts' });
+      own.times.style.display = 'none';
+      own.center = el('div', { class: 'ctr' }, own.sorts, own.times);
       own.aboutB = el('button', { class: 'sg', type: 'button', text: 'About and rules' });
       own.flairB = el('button', { class: 'sg', type: 'button', 'aria-haspopup': 'menu', text: 'Flairs' });
       own.fchip = el('a', { class: 'sg fchip' });
@@ -2242,7 +2296,7 @@
       own.joinB.addEventListener('click', function () { toggleJoin(); });
       own.moreB.addEventListener('click', function () { openCommunityMenu(own.moreB); });
       own.left = el('div', { class: 'bl' }, own.createB, own.aboutB, own.flairB, own.joinB, own.moreB, own.fchip);
-      own.bar = el('div', { class: 'bar' }, own.left, own.sorts, own.sg);
+      own.bar = el('div', { class: 'bar' }, own.left, own.center, own.sg);
       own.sg.addEventListener('click', toggleSugg);
       own.root.appendChild(own.bar);
       own.root.appendChild(own.grid);
@@ -2610,6 +2664,8 @@
         Array.prototype.slice.call(c.children, 0, 8).forEach(function (k) { o.push(T + '  ' + box(k)); });
       });
     }
+    var sdd = document.querySelector('shreddit-sort-dropdown');
+    o.push(T + 'sort dropdown: ' + (sdd ? 'attrs=' + (sdd.getAttributeNames ? sdd.getAttributeNames().join(' ') : '?') + ' text="' + String(sdd.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30) + '" detected=' + detectSort() : 'none'));
     var fp = document.querySelector('shreddit-feed shreddit-post');
     o.push(T + 'first post attributes: ' + (fp && fp.getAttributeNames ? fp.getAttributeNames().join(' ') : 'none') + ' | nsfwFlagged=' + own.shown.filter(function (i) { return own.posts.get(i) && own.posts.get(i).over_18; }).length + ' withImage=' + own.shown.filter(function (i) { return own.posts.get(i) && !!thumbFor(own.posts.get(i)); }).length);
     if (docEl().classList.contains('lbx-comm')) {
@@ -2843,7 +2899,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, postActions: postActions, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, postActions: postActions, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
