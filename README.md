@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.2.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.3.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -12,10 +12,13 @@ Status: **v0.2.1, early.** Written against Reddit's page structure as measured o
 - **Lightbox.** Clicking a card opens the post with its threaded comments. `J` / `K` or the arrow keys move between posts, `Esc` closes, and ctrl-click opens a post in a new tab as usual. Subreddit and user names are normal links.
 - **Voting.** The vote buttons press Reddit's own hidden buttons for that post. If they cannot be found the script says so instead of pretending.
 - **NSFW.** Posts marked 18+ get no thumbnail or text preview on the card, and their media is hidden behind a click in the lightbox. Communities marked 18+ get a plain letter in the rail instead of their icon.
+- **Sort bar.** Best, Hot, New, Top and Rising tabs at the top centre of the feed (no Best inside communities). They are plain links to Reddit's own sort pages.
+- **Image zoom.** Clicking an image in the lightbox opens it full screen; click again for full size with scrolling. Esc closes the image first, then the post.
+- **User hover card.** Hover (or tab to) a username on a card or in the lightbox for account age and karma, a **Start chat** link to Reddit's chat, and a link to their profile where Reddit's own Follow button is. Chat opens in a new tab.
 - **Suggested communities.** Hidden by default; a small "Suggested communities" button above the cards shows or hides the strip.
 - **Safe fallback.** If the cards cannot be drawn, the script goes back to showing Reddit's own cards in a plain grid and says why in the diagnostics.
 
-Not yet: the user hover card, the notifications dropdown, trimming the community banner, and replying. Reddit's header, profile menu and chat are left alone.
+Not yet: Save and Hide on cards, the "..." menu, voting and replying on comments, the notifications dropdown, and trimming the community banner. Reddit's header, profile menu and chat are left alone.
 
 ## Install and update (Violentmonkey or Tampermonkey)
 
@@ -36,7 +39,7 @@ Click the userscript manager's icon while on Reddit to see the script's menu:
 
 ## Privacy
 
-Nothing is sent anywhere except to Reddit itself. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: optional extra post details (`/by_id/`, `/api/info`; Reddit currently refuses these, and cards do not need them), a post's comments (`<post>.json`), and your community list (`/subreddits/mine/subscriber.json`). It stores only its on/off settings and whether the rail is expanded.
+Nothing is sent anywhere except to Reddit itself. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: optional extra post details (`/by_id/`, `/api/info`; Reddit currently refuses these, and cards do not need them), a post's comments (`<post>.json`), your community list (`/subreddits/mine/subscriber.json`), and the account age and karma of a user you hover (`/user/NAME/about.json`). It stores only its on/off settings and whether the rail is expanded.
 
 ## Layout of this repository
 

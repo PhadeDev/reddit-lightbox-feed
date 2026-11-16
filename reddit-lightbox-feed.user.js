@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.2.1
+// @version      0.3.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.2.1';
+  var VERSION = '0.3.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -232,6 +232,20 @@
   /* Lightbox styles (inside a shadow root, so Reddit CSS cannot leak in) */
   /* ------------------------------------------------------------------ */
 
+  var HC_CSS = [
+    '.hcard{position:fixed;z-index:60;width:292px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}',
+    '.hcard .hh{display:flex;gap:12px;align-items:center}',
+    '.hcard .hav{width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:700;font-size:20px;color:#fff;overflow:hidden;background:var(--accent-bg)}',
+    '.hcard .hav img{width:100%;height:100%;object-fit:cover;display:block}',
+    '.hcard .hn{font-weight:700;font-size:15px;overflow-wrap:anywhere}',
+    '.hcard .hs{color:var(--muted);font-size:12px}',
+    '.hcard .ha{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}',
+    '.hcard .hb{flex:1 1 auto;text-align:center;padding:7px 12px;border-radius:99px;border:1px solid var(--line);color:var(--fg);text-decoration:none;font-weight:600;font-size:13px}',
+    '.hcard .hb:hover{border-color:var(--accent)}',
+    '.hcard .hb.pri{background:var(--accent-bg)}',
+    '.hcard .hm{margin-top:10px;color:var(--muted);font-size:12px}'
+  ].join('\n');
+
   var LB_CSS = [
     ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#ff7a45;--scrim:rgba(8,5,8,.72);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
     ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#c8431a;--scrim:rgba(30,15,25,.55)}',
@@ -260,6 +274,14 @@
     '.chip.nsfw{background:#8E1537;color:#fff}',
     '.media{margin:0;position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#000;display:flex;flex-direction:column;align-items:center}',
     '.mimg{display:block;max-width:100%;max-height:68vh;width:100%;object-fit:contain;background:#000}',
+    'img.mimg[role="button"]{cursor:zoom-in}',
+    '.zoom{display:none;position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.94);align-items:center;justify-content:center;overflow:auto}',
+    '.zoom.on{display:flex}',
+    '.zoom img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;display:block}',
+    '.zoom.full.on{display:block}',
+    '.zoom.full img{max-width:none;max-height:none;margin:0 auto;cursor:zoom-out}',
+    '.zx{position:fixed;top:12px;right:12px;z-index:21;background:rgba(0,0,0,.6);color:#fff}',
+    '.zh{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:21;background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:3px 12px;border-radius:99px;max-width:calc(100vw - 32px);text-align:center}',
     '.media figcaption{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;padding:2px 8px;border-radius:99px;max-width:calc(100% - 20px)}',
     '.note{font-size:12px;color:var(--muted)}',
     '.gnav{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:grid;place-items:center}',
@@ -348,11 +370,11 @@
     root = host.attachShadow({ mode: 'open' });
     try {
       var sheet = new CSSStyleSheet();
-      sheet.replaceSync(LB_CSS);
+      sheet.replaceSync(LB_CSS + '\n' + HC_CSS);
       root.adoptedStyleSheets = [sheet];
     } catch (e) {
       var st = document.createElement('style');
-      st.textContent = LB_CSS;
+      st.textContent = LB_CSS + '\n' + HC_CSS;
       root.appendChild(st);
     }
     ui.scrim = el('div', { class: 'scrim', onclick: function () { close(); } });
@@ -369,6 +391,7 @@
     ui.panel = el('div', { class: 'panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Post', tabindex: '-1' }, ui.head, ui.postPane, ui.cmPane);
     root.appendChild(ui.scrim);
     root.appendChild(ui.panel);
+    ui.hover = hoverAttach(root);
     document.documentElement.appendChild(host);
   }
 
@@ -397,6 +420,7 @@
       host.style.display = 'flex';
       ui.panel.focus({ preventScroll: true });
     }
+    closeZoom();
     ui.prev.disabled = S.idx <= 0;
     ui.next.disabled = S.idx < 0 || S.idx >= S.list.length - 1;
     ui.count.textContent = S.idx >= 0 ? (S.idx + 1) + ' of ' + S.list.length : '';
@@ -421,6 +445,8 @@
 
   function close() {
     if (!S.open) return;
+    closeZoom();
+    if (ui.hover) ui.hover.hide();
     S.open = false;
     S.token++;
     host.style.display = 'none';
@@ -459,7 +485,113 @@
 
   function userLink(name) {
     if (!name || name === '[deleted]') return el('span', { text: '[deleted]' });
-    return el('a', { class: 'u', href: '/user/' + encodeURIComponent(name) + '/', text: 'u/' + name });
+    return el('a', { class: 'u usr', 'data-user': name, href: '/user/' + encodeURIComponent(name) + '/', text: 'u/' + name });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* User hover card: details from /user/NAME/about.json, Start chat is  */
+  /* a plain link to Reddit's chat, Follow stays on Reddit's own page.   */
+  /* ------------------------------------------------------------------ */
+
+  var HC = { data: {}, showT: 0, hideT: 0, cur: '' };
+
+  function userAbout(name) {
+    var k = String(name).toLowerCase();
+    if (!HC.data[k]) {
+      HC.data[k] = fetch('/user/' + encodeURIComponent(name) + '/about.json?raw_json=1', { credentials: 'same-origin' }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (j) { return (j && j.data) || {}; });
+      HC.data[k].catch(function () { delete HC.data[k]; });
+    }
+    return HC.data[k];
+  }
+
+  function redditorFor(utc) {
+    var days = Math.max(0, Math.floor((Date.now() / 1000 - utc) / 86400));
+    var y = Math.floor(days / 365), m = Math.floor(days / 30);
+    if (y >= 1) return y + (y === 1 ? ' year' : ' years');
+    if (m >= 1) return m + (m === 1 ? ' month' : ' months');
+    return days + (days === 1 ? ' day' : ' days');
+  }
+
+  function hoverAttach(rootNode) {
+    var pop = el('div', { class: 'hcard', role: 'dialog', 'aria-label': 'User details' });
+    pop.style.display = 'none';
+    rootNode.appendChild(pop);
+
+    function hideNow() { clearTimeout(HC.showT); pop.style.display = 'none'; HC.cur = ''; }
+    function hide() { clearTimeout(HC.showT); clearTimeout(HC.hideT); HC.hideT = setTimeout(hideNow, 220); }
+    function keep() { clearTimeout(HC.hideT); }
+    function anchorOf(t) { return t && t.closest ? t.closest('a.usr') : null; }
+    function inPop(t) { return !!(t && t.closest && t.closest('.hcard')); }
+
+    function place(a) {
+      var r = a.getBoundingClientRect ? a.getBoundingClientRect() : { left: 8, top: 8, bottom: 8 };
+      pop.style.display = 'block';
+      var h = pop.offsetHeight || 170;
+      var vw = window.innerWidth || 1200, vh = window.innerHeight || 800;
+      var left = Math.max(8, Math.min(r.left, vw - 292 - 8));
+      var top = r.bottom + 6;
+      if (top + h > vh - 8) top = Math.max(8, r.top - h - 6);
+      pop.style.left = Math.round(left) + 'px';
+      pop.style.top = Math.round(top) + 'px';
+    }
+
+    function render(a, name, d, note) {
+      var enc = encodeURIComponent(name);
+      var av = el('span', { class: 'hav', text: name.charAt(0).toUpperCase() });
+      av.style.background = 'hsl(' + (hashStr(name) % 360) + ' 45% 34%)';
+      var img = d && !(d.subreddit && d.subreddit.over_18) ? (d.snoovatar_img || d.icon_img || '') : '';
+      if (/^https:\/\//i.test(img)) {
+        var im = el('img', { src: img, alt: '', referrerpolicy: 'no-referrer' });
+        im.addEventListener('error', function () { if (im.remove) im.remove(); });
+        av.appendChild(im);
+      }
+      var sub = note || '';
+      if (d && !note) {
+        var karma = d.total_karma != null ? d.total_karma : (d.link_karma || 0) + (d.comment_karma || 0);
+        sub = (d.created_utc ? 'Redditor for ' + redditorFor(d.created_utc) + ' · ' : '') + fmt(karma) + ' karma';
+        if (d.is_suspended) sub = 'This account is suspended.';
+      }
+      var actions = [];
+      if (!d || !d.is_suspended) {
+        if (d && d.accept_chats === false) actions.push(el('span', { class: 'hm', text: 'Not accepting chat requests.' }));
+        else actions.push(el('a', { class: 'hb pri', href: 'https://chat.reddit.com/user/' + enc, target: '_blank', rel: 'noopener noreferrer', text: 'Start chat' }));
+        actions.push(el('a', { class: 'hb', href: '/user/' + enc + '/', title: 'Opens their profile, where Reddit\'s Follow button is', text: 'Profile and follow' }));
+      }
+      setKids(pop,
+        el('div', { class: 'hh' }, av, el('div', {}, el('div', { class: 'hn', text: 'u/' + name }), el('div', { class: 'hs', text: sub }))),
+        el('div', { class: 'ha' }, actions));
+      place(a);
+    }
+
+    function show(a) {
+      var name = a.getAttribute('data-user');
+      if (!name) return;
+      HC.cur = name;
+      keep();
+      render(a, name, null, 'Loading...');
+      userAbout(name).then(function (d) { if (HC.cur === name) render(a, name, d); },
+        function () { if (HC.cur === name) render(a, name, null, 'Details are not available.'); });
+    }
+
+    rootNode.addEventListener('mouseover', function (e) {
+      if (inPop(e.target)) { keep(); return; }
+      var a = anchorOf(e.target);
+      if (!a) return;
+      keep();
+      clearTimeout(HC.showT);
+      HC.showT = setTimeout(function () { show(a); }, 350);
+    });
+    rootNode.addEventListener('mouseout', function (e) { if (anchorOf(e.target) || inPop(e.target)) hide(); });
+    rootNode.addEventListener('focusin', function (e) {
+      if (inPop(e.target)) { keep(); return; }
+      var a = anchorOf(e.target);
+      if (a) show(a);
+    });
+    rootNode.addEventListener('focusout', function (e) { if (anchorOf(e.target) || inPop(e.target)) hide(); });
+    return { hide: hideNow, pop: pop };
   }
 
   function gate(node, label) {
@@ -476,6 +608,46 @@
     return im && im.source && im.source.url ? im.source.url : '';
   }
 
+  function openZoom(src) {
+    if (!ui.zoom) {
+      ui.zimg = el('img', { alt: '', referrerpolicy: 'no-referrer' });
+      ui.zx = el('button', { class: 'ib zx', type: 'button', 'aria-label': 'Close image', onclick: function () { closeZoom(); } }, svg(IC.x));
+      ui.zoom = el('div', { class: 'zoom', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Full-size image' }, ui.zx,
+        el('span', { class: 'zh', text: 'Click the image to switch between fit and full size. Esc to close.' }), ui.zimg);
+      ui.zimg.addEventListener('click', function (e) { e.stopPropagation(); ui.zoom.classList.toggle('full'); });
+      ui.zoom.addEventListener('click', function (e) { if (e.target === ui.zoom) closeZoom(); });
+      root.appendChild(ui.zoom);
+    }
+    ui.zimg.setAttribute('src', src);
+    ui.zoom.classList.remove('full');
+    ui.zoom.classList.add('on');
+    ui.zx.focus();
+  }
+
+  function zoomOpen() { return !!(ui.zoom && ui.zoom.classList.contains('on')); }
+
+  function closeZoom() {
+    if (!zoomOpen()) return;
+    ui.zoom.classList.remove('on', 'full');
+    if (ui.panel && ui.panel.focus) ui.panel.focus({ preventScroll: true });
+  }
+
+  function zoomable(img, getSrc) {
+    img.setAttribute('tabindex', '0');
+    img.setAttribute('role', 'button');
+    img.setAttribute('aria-label', 'Enlarge image');
+    img.setAttribute('title', 'Click to enlarge');
+    var go = function () {
+      var fig = img.parentNode;
+      if (fig && fig.classList && fig.classList.contains('blurred')) return;
+      var u = getSrc();
+      if (u) openZoom(u);
+    };
+    img.addEventListener('click', go);
+    img.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    return img;
+  }
+
   function mediaGallery(p) {
     var items = ((p.gallery_data && p.gallery_data.items) || []).map(function (it) {
       var m = p.media_metadata && p.media_metadata[it.media_id];
@@ -486,6 +658,7 @@
     if (!items.length) return null;
     var i = 0;
     var img = el('img', { class: 'mimg', alt: '', referrerpolicy: 'no-referrer' });
+    zoomable(img, function () { return items[i].src; });
     var cap = el('figcaption');
     function upd() {
       img.setAttribute('src', items[i].src);
@@ -513,9 +686,9 @@
       node = el('figure', { class: 'media' }, v);
       out.push(el('div', { class: 'note', text: 'This player has no sound. Use "Open on Reddit" in the top bar to hear it.' }));
     } else if (p.post_hint === 'image' && p.url) {
-      node = el('figure', { class: 'media' }, el('img', { class: 'mimg', alt: '', src: p.url, referrerpolicy: 'no-referrer' }));
+      node = el('figure', { class: 'media' }, zoomable(el('img', { class: 'mimg', alt: '', src: p.url, referrerpolicy: 'no-referrer' }), function () { return p.url; }));
     } else if (!p.is_self && previewUrl(p) && /^(image|rich:video|hosted:video|link)$/.test(p.post_hint || '')) {
-      node = el('figure', { class: 'media' }, el('img', { class: 'mimg', alt: '', src: previewUrl(p), referrerpolicy: 'no-referrer' }));
+      node = el('figure', { class: 'media' }, zoomable(el('img', { class: 'mimg', alt: '', src: previewUrl(p), referrerpolicy: 'no-referrer' }), function () { return previewUrl(p); }));
     }
     if (node) out.unshift((p.over_18 || p.spoiler) ? gate(node, p.over_18 ? 'NSFW' : 'Spoiler') : node);
     return out;
@@ -660,7 +833,12 @@
     '.ab{height:28px;padding:0 9px;border-radius:99px;display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}',
     '.ab:hover{background:var(--surface2);color:var(--fg)}',
     '.ab .ic{width:16px;height:16px}',
-    '.bar{display:flex;justify-content:flex-end;padding:0 0 8px}',
+    '.bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:0 0 10px}',
+    '.bar .sg{justify-self:end}',
+    '.sorts{display:inline-flex;gap:2px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:99px}',
+    '.so{padding:4px 16px;border-radius:99px;color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}',
+    '.so:hover{color:var(--fg)}',
+    '.so.on{background:var(--accent-bg);color:var(--fg)}',
     '.sg{height:28px;padding:0 12px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-size:12px}',
     '.sg:hover,.sg[aria-pressed="true"]{color:var(--fg);border-color:var(--accent)}',
     '.sentinel{height:2px}',
@@ -824,7 +1002,7 @@
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', bar: null, sg: null, mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', hover: null, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -880,7 +1058,7 @@
     return el('article', { class: 'card' + (hasT ? '' : ' nothumb'), 'data-id': p.name, tabindex: '0', role: 'listitem', 'aria-label': p.title || '' },
       media,
       el('div', { class: 'cmain' },
-        el('div', { class: 'meta' }, av, el('a', { class: 'sub', href: '/r/' + p.subreddit + '/', text: 'r/' + p.subreddit }), p.created_utc ? dot() : null, p.created_utc ? el('span', { text: ago(p.created_utc) }) : null),
+        el('div', { class: 'meta' }, av, el('a', { class: 'sub', href: '/r/' + p.subreddit + '/', text: 'r/' + p.subreddit }), (p.author && p.author !== '[deleted]') ? dot() : null, (p.author && p.author !== '[deleted]') ? el('a', { class: 'sub usr', 'data-user': p.author, href: '/user/' + encodeURIComponent(p.author) + '/', text: 'u/' + p.author }) : null, p.created_utc ? dot() : null, p.created_utc ? el('span', { text: ago(p.created_utc) }) : null),
         el('h3', {}, el('a', { class: 'tl', href: p.permalink, text: p.title || '' })),
         chips.length ? el('div', { class: 'flairs' }, chips) : null,
         snip ? el('p', { class: 'snip', text: snip }) : null,
@@ -946,6 +1124,7 @@
       if (a === 'open') { e.preventDefault(); openOwn(id); return; }
     }
     if (t.closest('a.sub')) return;
+    if (t.closest('a.usr')) return;
     if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     openOwn(id);
@@ -1007,6 +1186,32 @@
     clearCards();
   }
 
+  var SORTS = [['best', 'Best'], ['hot', 'Hot'], ['new', 'New'], ['top', 'Top'], ['rising', 'Rising']];
+
+  function sortInfo(path) {
+    var m = /^\/(?:r\/([^\/]+)\/)?(?:(best|hot|new|top|rising)\/?)?$/i.exec(path || '');
+    return m ? { sub: m[1] || '', cur: String(m[2] || '').toLowerCase() } : null;
+  }
+
+  function updateSort() {
+    if (!own.sorts) return;
+    var info = sortInfo(location.pathname);
+    var key = info ? info.sub + '|' + info.cur : '';
+    if (key === own.sortKey) return;
+    own.sortKey = key;
+    if (!info) { own.sorts.style.display = 'none'; return; }
+    own.sorts.style.display = '';
+    var base = info.sub ? '/r/' + info.sub + '/' : '/';
+    var cur = info.cur || (info.sub ? '' : 'best');
+    var links = SORTS.filter(function (x) { return !(info.sub && x[0] === 'best'); }).map(function (x) {
+      var on = cur === x[0];
+      var a = el('a', { class: 'so' + (on ? ' on' : ''), href: (x[0] === 'best' && !info.sub) ? '/' : base + x[0] + '/', text: x[1] });
+      if (on) a.setAttribute('aria-current', 'page');
+      return a;
+    });
+    setKids.apply(null, [own.sorts].concat(links));
+  }
+
   function toggleSugg() {
     var on = !docEl().classList.contains('lbx-sugg');
     docEl().classList.toggle('lbx-sugg', on);
@@ -1018,13 +1223,14 @@
       own.host = el('div', { id: 'lbx-feed-host' });
       own.host.style.cssText = 'display:block;width:100%;';
       own.root = own.host.attachShadow({ mode: 'open' });
-      adopt(own.root, FEED_CSS);
+      adopt(own.root, FEED_CSS + '\n' + HC_CSS);
       own.grid = el('div', { class: 'grid', role: 'list' });
       own.sentinel = el('div', { class: 'sentinel' });
       own.toastEl = el('div', { class: 'toast', role: 'status' });
       own.toastEl.style.display = 'none';
       own.sg = el('button', { class: 'sg', type: 'button', 'aria-pressed': 'false', text: 'Suggested communities' });
-      own.bar = el('div', { class: 'bar' }, own.sg);
+      own.sorts = el('nav', { class: 'sorts', 'aria-label': 'Sort posts' });
+      own.bar = el('div', { class: 'bar' }, el('span'), own.sorts, own.sg);
       own.sg.addEventListener('click', toggleSugg);
       own.root.appendChild(own.bar);
       own.root.appendChild(own.grid);
@@ -1032,9 +1238,11 @@
       own.root.appendChild(own.toastEl);
       own.root.addEventListener('click', onOwnClick);
       own.root.addEventListener('keydown', onOwnKey);
+      own.hover = hoverAttach(own.root);
     }
     if (!own.host.isConnected || own.host.parentNode !== f.parentNode) f.parentNode.insertBefore(own.host, f);
     own.host.setAttribute('data-theme', themeNow());
+    updateSort();
   }
 
   function pokeMore() {
@@ -1321,6 +1529,12 @@
   function onKey(e) {
     if (!S.open || e.ctrlKey || e.metaKey || e.altKey) return;
     var k = e.key;
+    if (zoomOpen()) {
+      if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); closeZoom(); }
+      else if (k === 'Tab') { e.preventDefault(); if (ui.zx) ui.zx.focus(); }
+      else if (k === 'ArrowRight' || k === 'ArrowLeft' || k === 'j' || k === 'k') { e.stopPropagation(); }
+      return;
+    }
     if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
     else if (k === 'ArrowRight' || k === 'j') { e.preventDefault(); e.stopPropagation(); step(1); }
     else if (k === 'ArrowLeft' || k === 'k') { e.preventDefault(); e.stopPropagation(); step(-1); }
@@ -1589,7 +1803,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
