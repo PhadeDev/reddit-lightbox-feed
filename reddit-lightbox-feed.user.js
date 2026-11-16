@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.2.0
+// @version      0.2.1
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.2.0';
+  var VERSION = '0.2.1';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -214,6 +214,11 @@
     'html.lbx-own shreddit-feed { display: block !important; }',
     'html.lbx-own shreddit-feed > *:not(faceplate-partial[slot="load-after"]) { display: none !important; }',
     'html.lbx-own shreddit-feed > faceplate-partial[slot="load-after"] { display: block !important; min-height: 4px; }',
+    'html.lbx-own.lbx-sugg div:has(> shreddit-feed) { display: flex !important; flex-direction: column; }',
+    'html.lbx-own.lbx-sugg shreddit-feed { display: contents !important; }',
+    'html.lbx-own.lbx-sugg #lbx-feed-host { order: 1; }',
+    'html.lbx-own.lbx-sugg shreddit-feed > in-feed-community-recommendations { display: block !important; order: 0; margin-bottom: 12px; }',
+    'html.lbx-own.lbx-sugg shreddit-feed > faceplate-partial[slot="load-after"] { order: 2; }',
     '@media (min-width: 900px) {',
     '  html.lbx-rail div:has(> #left-sidebar-container) { grid-template-columns: var(--lbx-rail-w, 64px) minmax(0, 1fr) !important; }',
     '  html.lbx-rail #flex-left-nav-container { display: none !important; }',
@@ -655,6 +660,9 @@
     '.ab{height:28px;padding:0 9px;border-radius:99px;display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}',
     '.ab:hover{background:var(--surface2);color:var(--fg)}',
     '.ab .ic{width:16px;height:16px}',
+    '.bar{display:flex;justify-content:flex-end;padding:0 0 8px}',
+    '.sg{height:28px;padding:0 12px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-size:12px}',
+    '.sg:hover,.sg[aria-pressed="true"]{color:var(--fg);border-color:var(--accent)}',
     '.sentinel{height:2px}',
     '.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;background:var(--fg);color:var(--surface);padding:8px 16px;border-radius:99px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:calc(100vw - 32px)}',
     '@media (prefers-reduced-motion:reduce){*{transition:none!important}}'
@@ -750,10 +758,73 @@
     return s;
   }
 
+  /* Card data read straight from the shreddit-post element, so cards do not
+     depend on Reddit's data endpoints (/by_id/ answered HTTP 403 in testing). */
+  function attrNum(e, n) {
+    var v = parseInt(String(e.getAttribute(n) || '').replace(/[^\d-]/g, ''), 10);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function isoToUtc(s) {
+    if (!s) return 0;
+    var t = Date.parse(String(s).replace(/(\.\d{3})\d+/, '$1').replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+    return isNaN(t) ? 0 : Math.floor(t / 1000);
+  }
+
+  function domThumb(e) {
+    var sels = ['[slot="thumbnail"]', '[slot="post-media-container"]'];
+    for (var i = 0; i < sels.length; i++) {
+      var c = e.querySelector(sels[i]);
+      if (!c) continue;
+      var m = c.querySelector('img[src], faceplate-img[src], shreddit-player[poster], shreddit-player-2[poster]');
+      var u = m && (m.getAttribute('src') || m.getAttribute('poster'));
+      if (/^https:\/\//i.test(u || '')) return u;
+    }
+    return '';
+  }
+
+  var NSFW_ATTR = /nsfw|over.?18|adult|mature/i;
+  var NSFW_SEL = '[class*="nsfw" i],[data-testid*="nsfw" i],[aria-label*="nsfw" i],[alt*="nsfw" i],[slot*="nsfw" i]';
+
+  function domNsfw(e) {
+    var names = typeof e.getAttributeNames === 'function' ? e.getAttributeNames() : [];
+    for (var i = 0; i < names.length; i++) {
+      if (NSFW_ATTR.test(names[i]) && !/^(false|0|no)$/i.test(e.getAttribute(names[i]) || '')) return true;
+    }
+    if (e.querySelector(NSFW_SEL)) return true;
+    var fl = e.querySelector('shreddit-post-flair');
+    return !!(fl && /^\s*nsfw\s*$/i.test(fl.textContent || ''));
+  }
+
+  function domPost(e) {
+    var id = e.getAttribute('id') || '';
+    var pl = e.getAttribute('permalink') || '';
+    if (pl && !/\/$/.test(pl)) pl += '/';
+    var type = String(e.getAttribute('post-type') || '').toLowerCase();
+    var sub = e.getAttribute('subreddit-name') || String(e.getAttribute('subreddit-prefixed-name') || '').replace(/^r\//, '');
+    var title = e.getAttribute('post-title') || '';
+    if (!title) { var tl = e.querySelector('[slot="title"]'); title = tl ? String(tl.textContent || '').replace(/\s+/g, ' ').trim() : ''; }
+    var created = isoToUtc(e.getAttribute('created-timestamp'));
+    if (!created) { var ta = e.querySelector('faceplate-timeago[ts]'); created = ta ? isoToUtc(ta.getAttribute('ts')) : 0; }
+    var fl = e.querySelector('shreddit-post-flair');
+    var body = e.querySelector('[slot="text-body"]');
+    var nsfw = domNsfw(e);
+    return {
+      name: id, title: title, subreddit: sub, author: e.getAttribute('author') || '', permalink: pl,
+      score: attrNum(e, 'score'), num_comments: attrNum(e, 'comment-count'), created_utc: created,
+      link_flair_text: fl ? String(fl.textContent || '').replace(/\s+/g, ' ').trim() : '',
+      over_18: nsfw, spoiler: e.hasAttribute('spoiler'), stickied: false, likes: null,
+      is_self: type === 'text', is_video: type === 'video', is_gallery: type === 'gallery',
+      domain: e.getAttribute('domain') || '', url: e.getAttribute('content-href') || '',
+      thumbnail: nsfw ? '' : domThumb(e),
+      selftext: (nsfw || !body) ? '' : String(body.textContent || '').replace(/\s+/g, ' ').trim()
+    };
+  }
+
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', bar: null, sg: null, mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -767,7 +838,7 @@
   function badgeText(p) {
     if (nsfwOf(p)) return 'NSFW';
     if (p.spoiler) return 'Spoiler';
-    if (p.is_gallery) return ((p.gallery_data && p.gallery_data.items && p.gallery_data.items.length) || '') + ' images';
+    if (p.is_gallery) { var gn = p.gallery_data && p.gallery_data.items && p.gallery_data.items.length; return gn ? gn + ' images' : 'Gallery'; }
     if (p.is_video) return 'Video';
     if (p.crosspost_parent_list && p.crosspost_parent_list.length) return 'Crosspost';
     if (!p.is_self && p.domain && !/(^|\.)(reddit\.com|redd\.it)$/i.test(p.domain) && !/^self\./.test(p.domain)) return p.domain;
@@ -809,7 +880,7 @@
     return el('article', { class: 'card' + (hasT ? '' : ' nothumb'), 'data-id': p.name, tabindex: '0', role: 'listitem', 'aria-label': p.title || '' },
       media,
       el('div', { class: 'cmain' },
-        el('div', { class: 'meta' }, av, el('a', { class: 'sub', href: '/r/' + p.subreddit + '/', text: 'r/' + p.subreddit }), dot(), el('span', { text: ago(p.created_utc) })),
+        el('div', { class: 'meta' }, av, el('a', { class: 'sub', href: '/r/' + p.subreddit + '/', text: 'r/' + p.subreddit }), p.created_utc ? dot() : null, p.created_utc ? el('span', { text: ago(p.created_utc) }) : null),
         el('h3', {}, el('a', { class: 'tl', href: p.permalink, text: p.title || '' })),
         chips.length ? el('div', { class: 'flairs' }, chips) : null,
         snip ? el('p', { class: 'snip', text: snip }) : null,
@@ -887,17 +958,41 @@
     }
   }
 
-  function fetchByIds(ids) {
-    var url = '/by_id/' + ids.join(',') + '.json?raw_json=1';
+  /* Optional extra detail (images, NSFW flag, text) from Reddit's data
+     endpoints. Cards work without it, so a refusal is not an error. */
+  var API_PATHS = [
+    function (ids) { return '/by_id/' + ids.join(',') + '.json?raw_json=1'; },
+    function (ids) { return '/api/info.json?id=' + ids.join(',') + '&raw_json=1'; }
+  ];
+
+  function fetchListing(url) {
     return fetch(url, { credentials: 'same-origin' }).then(function (r) {
-      if (!r.ok) throw new Error('Reddit answered HTTP ' + r.status);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function (j) {
       var m = new Map();
       ((j && j.data && j.data.children) || []).forEach(function (c) { if (c && c.data && c.data.name) m.set(c.data.name, c.data); });
-      log('card data:', m.size, 'of', ids.length);
+      if (!m.size) throw new Error('no posts returned');
       return m;
     });
+  }
+
+  function enrich(ids) {
+    if (own.apiDead) return Promise.resolve(new Map());
+    var order = own.apiOk >= 0 ? [own.apiOk] : [0, 1];
+    var notes = [];
+    function tryAt(k) {
+      if (k >= order.length) {
+        if (own.apiOk < 0) { own.apiDead = notes.join('; '); log('extra post data unavailable, using the page data only:', own.apiDead); }
+        return Promise.resolve(new Map());
+      }
+      var ix = order[k];
+      return fetchListing(API_PATHS[ix](ids)).then(function (m) { own.apiOk = ix; return m; }, function (err) {
+        notes.push((ix ? 'api/info ' : 'by_id ') + ((err && err.message) || err));
+        return tryAt(k + 1);
+      });
+    }
+    return tryAt(0);
   }
 
   function clearCards() {
@@ -912,6 +1007,12 @@
     clearCards();
   }
 
+  function toggleSugg() {
+    var on = !docEl().classList.contains('lbx-sugg');
+    docEl().classList.toggle('lbx-sugg', on);
+    if (own.sg) own.sg.setAttribute('aria-pressed', String(on));
+  }
+
   function ensureHost(f) {
     if (!own.host) {
       own.host = el('div', { id: 'lbx-feed-host' });
@@ -922,6 +1023,10 @@
       own.sentinel = el('div', { class: 'sentinel' });
       own.toastEl = el('div', { class: 'toast', role: 'status' });
       own.toastEl.style.display = 'none';
+      own.sg = el('button', { class: 'sg', type: 'button', 'aria-pressed': 'false', text: 'Suggested communities' });
+      own.bar = el('div', { class: 'bar' }, own.sg);
+      own.sg.addEventListener('click', toggleSugg);
+      own.root.appendChild(own.bar);
       own.root.appendChild(own.grid);
       own.root.appendChild(own.sentinel);
       own.root.appendChild(own.toastEl);
@@ -973,10 +1078,10 @@
     }
     if (!f) { docEl().classList.remove('lbx-wait'); return; }
     if (own.failed && Date.now() - own.failAt < 30000) return;
-    var ids = [], seen = {};
+    var ids = [], seen = {}, els = {};
     Array.prototype.forEach.call(f.querySelectorAll('shreddit-post'), function (p) {
       var id = p.getAttribute('id');
-      if (/^t3_[a-z0-9]+$/i.test(id || '') && !seen[id]) { seen[id] = 1; ids.push(id); }
+      if (/^t3_[a-z0-9]+$/i.test(id || '') && !seen[id]) { seen[id] = 1; ids.push(id); els[id] = p; }
     });
     if (!ids.length) return;
     if (own.shown.length && ids.indexOf(own.shown[0]) < 0) clearCards();
@@ -990,10 +1095,11 @@
     if (!batch.length) { if (own.shown.length && nearBottom()) pokeMore(); return; }
     own.busy = true;
     batch.forEach(function (id) { own.have[id] = 1; });
-    fetchByIds(batch).then(function (map) {
+    enrich(batch).then(function (map) {
       batch.forEach(function (id) {
         var p = map.get(id);
-        if (!p) return;
+        if (!p) { try { p = domPost(els[id]); } catch (er) { log('card data error:', er); } }
+        if (!p || !p.permalink || !p.title) return;
         own.posts.set(id, p);
         own.plToId[p.permalink] = id;
         var c = cardEl(p);
@@ -1006,7 +1112,7 @@
         docEl().classList.add('lbx-own');
         docEl().classList.remove('lbx-wait');
         watchSentinel();
-      }
+      } else docEl().classList.remove('lbx-wait');
       setTimeout(scanFeed, 60);
     }).catch(function (err) {
       own.busy = false;
@@ -1258,7 +1364,9 @@
         Array.prototype.slice.call(c.children, 0, 8).forEach(function (k) { o.push(T + '  ' + box(k)); });
       });
     }
-    o.push(T + 'own cards shown=' + own.shown.length + ' failed=' + (own.failed || 'no') + ' html.lbx-own=' + docEl().classList.contains('lbx-own') +
+    var fp = document.querySelector('shreddit-feed shreddit-post');
+    o.push(T + 'first post attributes: ' + (fp && fp.getAttributeNames ? fp.getAttributeNames().join(' ') : 'none') + ' | nsfwFlagged=' + own.shown.filter(function (i) { return own.posts.get(i) && own.posts.get(i).over_18; }).length + ' withImage=' + own.shown.filter(function (i) { return own.posts.get(i) && !!thumbFor(own.posts.get(i)); }).length);
+    o.push(T + 'own cards shown=' + own.shown.length + ' failed=' + (own.failed || 'no') + ' extraData=' + (own.apiOk >= 0 ? 'ok(' + own.apiOk + ')' : (own.apiDead || 'untried')) + ' html.lbx-own=' + docEl().classList.contains('lbx-own') +
       ' rail=' + (rail.host ? 'built' : 'no') + ' communities=' + (rail.subs ? rail.subs.length : 'n/a') + (rail.err ? ' railError=' + rail.err : '') +
       ' cfg=' + JSON.stringify(cfg));
     o.push(T + 'recent log:');
@@ -1481,7 +1589,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, scanFeed: scanFeed, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }

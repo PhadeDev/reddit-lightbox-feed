@@ -2,17 +2,18 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.2.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.2.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
-- **Own cards.** The script reads which posts Reddit has put in the feed, fetches each post's details from Reddit's public data (`/by_id/`), and draws its own bordered cards with thumbnail, title, flair, a short text preview, vote buttons and comment count. Reddit's own cards stay in the page, hidden, so scrolling still loads more posts.
+- **Own cards.** The script reads each post's details from the feed Reddit has already put on the page (title, flair, score, comment count, age, thumbnail), and draws its own bordered cards with thumbnail, title, flair, a short text preview, vote buttons and comment count. Reddit's own cards stay in the page, hidden, so scrolling still loads more posts.
 - **Clutter removed.** Promoted posts, the "Suggested communities" strip, community highlights, the right-hand sidebar and the card/compact view switch are hidden on feed pages.
 - **Icon rail.** The left menu becomes a 64px rail of icons (Home, Popular, News, Explore, then your communities, favourites first). The menu button expands it to show names. The choice is remembered.
 - **Lightbox.** Clicking a card opens the post with its threaded comments. `J` / `K` or the arrow keys move between posts, `Esc` closes, and ctrl-click opens a post in a new tab as usual. Subreddit and user names are normal links.
 - **Voting.** The vote buttons press Reddit's own hidden buttons for that post. If they cannot be found the script says so instead of pretending.
 - **NSFW.** Posts marked 18+ get no thumbnail or text preview on the card, and their media is hidden behind a click in the lightbox. Communities marked 18+ get a plain letter in the rail instead of their icon.
-- **Safe fallback.** If Reddit's data cannot be fetched, the script goes back to showing Reddit's own cards in a plain grid and says why in the diagnostics.
+- **Suggested communities.** Hidden by default; a small "Suggested communities" button above the cards shows or hides the strip.
+- **Safe fallback.** If the cards cannot be drawn, the script goes back to showing Reddit's own cards in a plain grid and says why in the diagnostics.
 
 Not yet: the user hover card, the notifications dropdown, trimming the community banner, and replying. Reddit's header, profile menu and chat are left alone.
 
@@ -35,7 +36,7 @@ Click the userscript manager's icon while on Reddit to see the script's menu:
 
 ## Privacy
 
-Nothing is sent anywhere except to Reddit itself. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: post details (`/by_id/`), a post's comments (`<post>.json`), and your community list (`/subreddits/mine/subscriber.json`). It stores only its on/off settings and whether the rail is expanded.
+Nothing is sent anywhere except to Reddit itself. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: optional extra post details (`/by_id/`, `/api/info`; Reddit currently refuses these, and cards do not need them), a post's comments (`<post>.json`), and your community list (`/subreddits/mine/subscriber.json`). It stores only its on/off settings and whether the rail is expanded.
 
 ## Layout of this repository
 

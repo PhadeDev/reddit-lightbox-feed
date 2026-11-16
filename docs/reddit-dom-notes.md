@@ -60,3 +60,10 @@ Right-hand controls: `#advertise-button`, `#header-action-item-chat-button`, `#c
 - Where the sidebar lives on feed pages (the script tries `#right-sidebar-container`).
 - Which element carries the bell's unread badge.
 - Whether the comments button inside a card is an `a` or a `button` (the script accepts either, matching on its label).
+
+## Live findings, 16/11/2026 (v0.2.0 diagnostics)
+
+- `/by_id/...json` answered **HTTP 403** from the page (logged in). Cards are therefore built from `shreddit-post` attributes (`post-title`, `score`, `comment-count`, `created-timestamp`, `permalink`, `subreddit-name`, `post-type`, `domain`) and light-DOM slots (thumbnail, flair, text body). `/api/info.json` is tried as an alternative and recorded in diagnostics.
+- `/subreddits/mine/subscriber.json` worked: 203 communities loaded for the rail.
+- With the rail on, the grid became `64px 2986px` and the feed spanned the full width, so the grid overrides work.
+- Whether a post carries an NSFW attribute is unconfirmed; "Copy diagnostics" now lists the first post's attribute names.
