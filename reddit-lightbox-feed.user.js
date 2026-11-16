@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.8.0
+// @version      0.9.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.8.0';
+  var VERSION = '0.9.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -134,6 +134,7 @@
     save: 'M6 3h12v18l-6-4-6 4z',
     hide: 'M3 3l18 18M10.6 5.2A9.5 9.5 0 0 1 12 5c6 0 9.5 7 9.5 7a15 15 0 0 1-2.6 3.3M6.4 6.5C3.9 8.2 2.5 12 2.5 12S6 19 12 19a9 9 0 0 0 4-1M9.9 9.9a3 3 0 0 0 4.2 4.2',
     more: 'M5 12h.01M12 12h.01M19 12h.01',
+    plus: 'M12 5v14M5 12h14',
     reply: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 6 6v3'
   };
 
@@ -218,6 +219,7 @@
     'html.lbx-own shreddit-feed { display: block !important; }',
     'html.lbx-own shreddit-feed > *:not(faceplate-partial[slot="load-after"]) { display: none !important; }',
     'html.lbx-own shreddit-feed > faceplate-partial[slot="load-after"] { display: block !important; min-height: 4px; }',
+    'html.lbx-own.lbx-comm create-post-entry-point-wrapper, html.lbx-own.lbx-comm shreddit-subreddit-header-buttons { display: none !important; }',
     'html.lbx-own.lbx-comm #subreddit-banner-img { -webkit-mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,0) 100%); mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,0) 100%); border-radius: 0 !important; }',
     'html.lbx-own.lbx-sugg div:has(> shreddit-feed) { display: flex !important; flex-direction: column; }',
     'html.lbx-own.lbx-sugg shreddit-feed { display: contents !important; }',
@@ -909,7 +911,7 @@
     return ACT.uhP;
   }
 
-  function postApi(path, fields) {
+  function postApi(path, fields, method) {
     var label = path.replace('/api/', '');
     function once() {
       return modhash().then(function (uh) {
@@ -917,7 +919,7 @@
         Object.keys(fields).forEach(function (k) { body.set(k, fields[k]); });
         body.set('uh', uh);
         body.set('api_type', 'json');
-        return fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Modhash': uh }, body: body.toString() });
+        return fetch(path, { method: method || 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Modhash': uh }, body: body.toString() });
       }).then(function (r) {
         if (!r.ok) {
           var err = new Error(r.status === 429 ? 'Reddit says slow down (HTTP 429). Wait a few seconds and try again.' : 'Reddit answered HTTP ' + r.status);
@@ -1179,6 +1181,14 @@
     '.so.on{background:var(--gold);color:var(--gold-ink)}',
     '.sg{display:inline-flex;align-items:center;height:32px;padding:0 16px;border:1px solid var(--accent);border-radius:99px;background:var(--accent-bg);color:var(--fg);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}',
     '.sg:hover,.sg[aria-pressed="true"]{background:var(--accent);color:var(--gold-ink)}',
+    '.sg .ic{width:14px;height:14px;margin-right:6px}',
+    '.sg:has(> .ic:only-child) .ic{margin-right:0}',
+    '.sg.join.on{background:transparent;color:var(--fg)}',
+    '.mi.dis{color:var(--muted);cursor:default}',
+    '.mi.dis:hover{background:none}',
+    '.rowsep{grid-column:1/-1;height:16px;position:relative;pointer-events:none}',
+    '.rowsep::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:linear-gradient(to right,var(--accent),rgba(0,0,0,0) 85%);opacity:.55}',
+    '.rowsep::after{content:"\\203A \\203A \\203A";position:absolute;left:0;top:50%;transform:translateY(-50%);padding:0 10px 0 2px;background:var(--color-neutral-background,#0e1113);color:var(--accent);opacity:.8;font-size:12px;letter-spacing:2px}',
     '.sg.cta{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}',
     '.sg.cta:hover{filter:brightness(1.1);background:var(--gold);color:var(--gold-ink)}',
     '.sentinel{height:2px}',
@@ -1365,7 +1375,7 @@
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, vtouched: {}, voteMap: null, votesP: null, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', joinB: null, joinL: null, moreB: null, subSt: null, rowT: 0, rowW: 0, ro: null, sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, vtouched: {}, voteMap: null, votesP: null, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -1841,6 +1851,9 @@
     if (own.left) own.left.style.display = info ? '' : 'none';
     if (own.aboutB) own.aboutB.style.display = showLeft ? '' : 'none';
     if (own.flairB) own.flairB.style.display = showLeft ? '' : 'none';
+    if (own.joinB) own.joinB.style.display = showLeft ? '' : 'none';
+    if (own.moreB) own.moreB.style.display = showLeft ? '' : 'none';
+    if (showLeft) refreshJoin(own.sub);
     if (own.createB) own.createB.setAttribute('href', showLeft ? '/r/' + encodeURIComponent(own.sub) + '/submit/' : '/submit/');
     docEl().classList.toggle('lbx-comm', showLeft);
     var fl = showLeft ? currentFlair() : '';
@@ -1874,12 +1887,22 @@
     });
   }
 
+  var SUBA = {};
+  function subAbout(sub) {
+    var k = sub.toLowerCase();
+    if (!SUBA[k]) {
+      SUBA[k] = getJson('/r/' + encodeURIComponent(sub) + '/about.json?raw_json=1');
+      SUBA[k].catch(function () { delete SUBA[k]; });
+    }
+    return SUBA[k];
+  }
+
   function subData(sub) {
     var k = sub.toLowerCase();
     if (!SUBI[k]) {
       var b = '/r/' + encodeURIComponent(sub);
       var soft = function (u) { return getJson(u).catch(function () { return null; }); };
-      SUBI[k] = Promise.all([soft(b + '/about.json?raw_json=1'), soft(b + '/about/rules.json?raw_json=1'), soft(b + '/api/widgets?raw_json=1')]).then(function (a) {
+      SUBI[k] = Promise.all([subAbout(sub).catch(function () { return null; }), soft(b + '/about/rules.json?raw_json=1'), soft(b + '/api/widgets?raw_json=1')]).then(function (a) {
         return { about: a[0] && a[0].data, rules: a[1] && a[1].rules, widgets: a[2] };
       });
     }
@@ -2030,6 +2053,164 @@
     });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Join, favourite and custom feeds, in the bar                        */
+  /* ------------------------------------------------------------------ */
+
+  function paintJoin() {
+    var st = own.subSt && own.subSt.sub === own.sub ? own.subSt : null;
+    var on = !!(st && st.joined);
+    if (own.joinL) own.joinL.textContent = on ? 'Joined' : 'Join';
+    if (own.joinB) {
+      own.joinB.className = 'sg join' + (on ? ' on' : '');
+      own.joinB.setAttribute('aria-pressed', String(on));
+    }
+  }
+
+  function refreshJoin(sub) {
+    if (!sub || (own.subSt && own.subSt.sub === sub)) { paintJoin(); return; }
+    own.subSt = { sub: sub, joined: false, fav: false, loaded: false };
+    paintJoin();
+    subAbout(sub).then(function (j) {
+      var a = j && j.data;
+      if (!own.subSt || own.subSt.sub !== sub || own.subSt.touched) return;
+      own.subSt.joined = !!(a && a.user_is_subscriber);
+      own.subSt.fav = !!(a && a.user_has_favorited);
+      own.subSt.loaded = true;
+      paintJoin();
+    }, function () { /* leave the button as Join */ });
+  }
+
+  function toggleJoin() {
+    var sub = own.sub;
+    if (!sub) return;
+    refreshJoin(sub);
+    var st = own.subSt;
+    var prev = st.joined;
+    st.touched = true;
+    st.joined = !prev;
+    paintJoin();
+    postApi('/api/subscribe', { action: prev ? 'unsub' : 'sub', sr_name: sub, skip_initial_defaults: 'true' }).then(function () {
+      toast(prev ? 'Left r/' + sub : 'Joined r/' + sub);
+    }, function (e) {
+      st.joined = prev;
+      paintJoin();
+      toast((prev ? 'Leaving' : 'Joining') + ' did not work: ' + String((e && e.message) || e));
+    });
+  }
+
+  function menuShell() {
+    if (!own.menu) {
+      own.menu = el('div', { class: 'pmenu', role: 'menu' });
+      own.menu.style.display = 'none';
+      own.root.appendChild(own.menu);
+    }
+    return own.menu;
+  }
+
+  function placeMenu(btn, w) {
+    var r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 20, bottom: 80, top: 60 };
+    var m = own.menu;
+    m.style.display = 'flex';
+    var vw = (typeof window !== 'undefined' && window.innerWidth) || 1200;
+    m.style.left = Math.max(8, Math.min(Math.round(r.left), vw - (w || 240) - 8)) + 'px';
+    m.style.top = Math.round(r.bottom + 4) + 'px';
+  }
+
+  function menuItem(label, fn) {
+    return el('button', { class: 'mi', type: 'button', role: 'menuitem', text: label, onclick: function () { fn(); } });
+  }
+
+  function openCommunityMenu(btn) {
+    var sub = own.sub;
+    if (!sub) return;
+    menuShell();
+    if (own.menuId === 'comm' && own.menu.style.display !== 'none') { closeMenu(); return; }
+    own.menuId = 'comm';
+    refreshJoin(sub);
+    var st = own.subSt;
+    var items = [];
+    if (st && st.joined) {
+      items.push(menuItem(st.fav ? 'Remove from favourites' : 'Add to favourites', function () {
+        closeMenu();
+        var prev = !!st.fav;
+        st.fav = !prev;
+        postApi('/api/favorite', { make_favorite: String(!prev), sr_name: sub }).then(function () { toast(prev ? 'Removed from favourites' : 'Added to favourites'); }, function (e) {
+          st.fav = prev;
+          toast('Favourites did not work: ' + String((e && e.message) || e));
+        });
+      }));
+    } else items.push(el('div', { class: 'mi dis', text: 'Join this community to add it to favourites' }));
+    items.push(menuItem('Add to custom feed...', function () { openFeedChooser(btn, sub); }));
+    items.push(menuItem('Copy community link', function () {
+      var url = location.origin + '/r/' + encodeURIComponent(sub) + '/';
+      if (!gm.copy(url) && navigator.clipboard) navigator.clipboard.writeText(url).catch(function () { /* ignore */ });
+      closeMenu();
+      toast('Link copied');
+    }));
+    items.push(el('a', { class: 'mi', role: 'menuitem', href: '/r/' + encodeURIComponent(sub) + '/about/', text: 'Open community page on Reddit', onclick: function () { closeMenu(); } }));
+    setKids(own.menu, items);
+    own.menu.style.maxHeight = '';
+    own.menu.style.overflowY = '';
+    placeMenu(btn, 260);
+  }
+
+  function openFeedChooser(btn, sub) {
+    own.menuId = 'comm';
+    setKids(own.menu, el('div', { class: 'mi', text: 'Loading your custom feeds...' }));
+    getJson('/api/multi/mine?expand_srs=false&raw_json=1').then(function (list) {
+      if (own.menuId !== 'comm') return;
+      var feeds = (Array.isArray(list) ? list : []).map(function (x) { return x && x.data; }).filter(function (d) { return d && d.path; });
+      var kids = [el('div', { class: 'mi dis', text: 'Add r/' + sub + ' to:' })];
+      feeds.forEach(function (d) {
+        kids.push(menuItem(d.display_name || d.name || d.path, function () {
+          closeMenu();
+          postApi('/api/multi' + d.path.replace(/\/+$/, '') + '/r/' + encodeURIComponent(sub), { model: JSON.stringify({ name: sub }) }, 'PUT').then(function () {
+            toast('Added to ' + (d.display_name || d.name));
+          }, function (e) { toast('Adding to the feed did not work: ' + String((e && e.message) || e)); });
+        }));
+      });
+      if (!feeds.length) kids.push(el('div', { class: 'mi', text: 'You have no custom feeds yet.' }));
+      setKids(own.menu, kids);
+    }, function (e) { setKids(own.menu, el('div', { class: 'mi', text: 'Could not load your custom feeds: ' + String((e && e.message) || e) })); });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Reading-order guide: a faint arrowed line between rows of cards     */
+  /* ------------------------------------------------------------------ */
+
+  function layoutRows() {
+    var g = own.grid;
+    if (!g) return;
+    Array.prototype.slice.call(g.querySelectorAll('.rowsep')).forEach(function (x) { if (x.parentNode) x.parentNode.removeChild(x); });
+    var cards = Array.prototype.slice.call(g.querySelectorAll('.card'));
+    var rowTop = null, firsts = [];
+    cards.forEach(function (c) {
+      var top = c.offsetTop || 0;
+      if (rowTop === null || top > rowTop + 4) { firsts.push(c); rowTop = top; }
+    });
+    firsts.slice(1).forEach(function (c) { g.insertBefore(el('div', { class: 'rowsep', 'aria-hidden': 'true' }), c); });
+  }
+
+  function schedRows() {
+    clearTimeout(own.rowT);
+    own.rowT = setTimeout(layoutRows, 140);
+  }
+
+  function watchRows() {
+    if (own.ro || !own.grid) return;
+    if (typeof ResizeObserver === 'function') {
+      own.ro = new ResizeObserver(function () {
+        var w = own.grid.clientWidth;
+        if (w !== own.rowW) { own.rowW = w; schedRows(); }
+      });
+      own.ro.observe(own.grid);
+    } else {
+      own.ro = { disconnect: function () { /* none */ } };
+      if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('resize', schedRows);
+    }
+  }
+
   function toggleSugg() {
     var on = !docEl().classList.contains('lbx-sugg');
     docEl().classList.toggle('lbx-sugg', on);
@@ -2054,8 +2235,13 @@
       own.fchip.style.display = 'none';
       own.aboutB.addEventListener('click', function () { if (own.sub) openAbout(own.sub); });
       own.flairB.addEventListener('click', function () { if (own.sub) openFlairs(own.sub, own.flairB); });
-      own.createB = el('a', { class: 'sg cta', href: '/submit/', text: 'Create post' });
-      own.left = el('div', { class: 'bl' }, own.createB, own.aboutB, own.flairB, own.fchip);
+      own.createB = el('a', { class: 'sg cta', href: '/submit/' }, svg(IC.plus), el('span', { text: 'Create post' }));
+      own.joinL = el('span', { text: 'Join' });
+      own.joinB = el('button', { class: 'sg join', type: 'button', 'aria-pressed': 'false' }, own.joinL);
+      own.moreB = el('button', { class: 'sg', type: 'button', 'aria-haspopup': 'menu', 'aria-label': 'More community actions', title: 'More' }, svg(IC.more));
+      own.joinB.addEventListener('click', function () { toggleJoin(); });
+      own.moreB.addEventListener('click', function () { openCommunityMenu(own.moreB); });
+      own.left = el('div', { class: 'bl' }, own.createB, own.aboutB, own.flairB, own.joinB, own.moreB, own.fchip);
       own.bar = el('div', { class: 'bar' }, own.left, own.sorts, own.sg);
       own.sg.addEventListener('click', toggleSugg);
       own.root.appendChild(own.bar);
@@ -2126,9 +2312,10 @@
     if (!ids.length) return;
     if (own.shown.length && ids.indexOf(own.shown[0]) < 0) clearCards();
     ensureHost(f);
-    if (own.shown.length && own.grid.childElementCount !== own.shown.length) {
+    if (own.shown.length && own.grid.querySelectorAll('.card').length !== own.shown.length) {
       setKids(own.grid);
       own.shown.forEach(function (id) { own.grid.appendChild(own.cards[id]); });
+      schedRows();
     }
     if (own.busy) return;
     var batch = ids.filter(function (id) { return !own.have[id]; }).slice(0, 60);
@@ -2150,6 +2337,8 @@
         own.shown.push(id);
       });
       own.busy = false;
+      watchRows();
+      schedRows();
       if (own.shown.length) {
         own.shown.forEach(function (i) { paintCard(i); });
         loadSaved();
@@ -2654,7 +2843,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, postActions: postActions, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, postActions: postActions, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
