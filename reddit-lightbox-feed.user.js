@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.10.0
+// @version      0.10.1
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.10.0';
+  var VERSION = '0.10.1';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -186,7 +186,7 @@
   /* Settings and menu                                                  */
   /* ------------------------------------------------------------------ */
 
-  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true), extra: gm.get('extra', false) };
+  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true), extra: gm.get('extra', false), homeSort: gm.get('homeSort', 'hot') };
 
   /* ------------------------------------------------------------------ */
   /* Layout (CSS only, scoped to pages that contain a feed)             */
@@ -1190,9 +1190,9 @@
     '.sg.join.on{background:transparent;color:var(--fg)}',
     '.mi.dis{color:var(--muted);cursor:default}',
     '.mi.dis:hover{background:none}',
-    '.rowsep{grid-column:1/-1;height:24px;position:relative;pointer-events:none}',
-    '.rowsep::before{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2244%22 height=%2220%22 viewBox=%220 0 44 20%22%3E%3Cpath d=%22M17 4l8 6-8 6%22 fill=%22none%22 stroke=%22%23e0a3c8%22 stroke-width=%222.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E"),linear-gradient(to right,#e0a3c8,rgba(224,163,200,0));background-repeat:repeat-x,no-repeat;background-size:44px 20px,100% 1px;background-position:left center,left center;-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,.95),rgba(0,0,0,0) 96%);mask-image:linear-gradient(to right,rgba(0,0,0,.95),rgba(0,0,0,0) 96%)}',
-    ':host([data-theme="light"]) .rowsep::before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2244%22 height=%2220%22 viewBox=%220 0 44 20%22%3E%3Cpath d=%22M17 4l8 6-8 6%22 fill=%22none%22 stroke=%22%23532A45%22 stroke-width=%222.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E"),linear-gradient(to right,#532A45,rgba(83,42,69,0))}',
+    '.rowsep{grid-column:1/-1;height:16px;position:relative;pointer-events:none}',
+    '.rowsep::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:linear-gradient(to right,var(--accent),rgba(0,0,0,0) 85%);opacity:.55}',
+    '.rowsep::after{content:"\\203A \\203A \\203A";position:absolute;left:0;top:50%;transform:translateY(-50%);padding:0 10px 0 2px;background:var(--color-neutral-background,#0e1113);color:var(--accent);opacity:.8;font-size:12px;letter-spacing:2px}',
     '.sg.cta{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}',
     '.sg.cta:hover{filter:brightness(1.1);background:var(--gold);color:var(--gold-ink)}',
     '.sentinel{height:2px}',
@@ -2499,12 +2499,19 @@
     return img;
   }
 
+  function homeHref() {
+    return cfg.homeSort && cfg.homeSort !== 'best' ? '/' + cfg.homeSort + '/' : '/';
+  }
+
   function renderRail() {
     if (!rail.list) return;
     var path = location.pathname.toLowerCase();
     rail.path = location.pathname;
     function active(h) { return h === '/' ? path === '/' : path.indexOf(h.toLowerCase().replace(/\/$/, '')) === 0; }
-    var kids = RAIL_NAV.map(function (n) { return railItem(svg(n.d), n.t, n.h, active(n.h)); });
+    var kids = RAIL_NAV.map(function (n) {
+      if (n.t === 'Home') return railItem(svg(n.d), n.t, homeHref(), /^\/(best|hot|new|top|rising)?\/?$/.test(path));
+      return railItem(svg(n.d), n.t, n.h, active(n.h));
+    });
     kids.push(el('div', { class: 'sep' }));
     kids.push(el('h4', { text: 'Your communities' }));
     if (rail.subs && rail.subs.length) {
@@ -2865,6 +2872,7 @@
     gm.menu('Layout: ' + (cfg.layout ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('layout', !cfg.layout); location.reload(); });
     gm.menu('Lightbox: ' + (cfg.lightbox ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('lightbox', !cfg.lightbox); location.reload(); });
     gm.menu('Own cards: ' + (cfg.cards ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('cards', !cfg.cards); location.reload(); });
+    gm.menu('Home button opens: ' + (cfg.homeSort === 'best' ? 'Reddit default (Best)' : 'Hot') + ' (click to switch and reload)', function () { gm.set('homeSort', cfg.homeSort === 'best' ? 'hot' : 'best'); location.reload(); });
     gm.menu('Left icon rail: ' + (cfg.rail ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('rail', !cfg.rail); location.reload(); });
     gm.menu('Copy diagnostics', function () {
       var t = diag();
@@ -2899,7 +2907,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, postActions: postActions, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, postActions: postActions, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }

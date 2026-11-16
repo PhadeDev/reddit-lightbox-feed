@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.10.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.10.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -24,7 +24,8 @@ Status: **v0.10.0, early.** Written against Reddit's page structure as measured 
 - **Actions inside the lightbox post.** Upvote, downvote, Save, Copy link and Hide sit under the post text, and stay in step with the card behind. Hide moves on to the next post. The separate comment-count pill is gone (the comments column shows it).
 - **Coloured comment threads.** Each reply level has its own colour on the thread line (blue, red, green, gold, purple, orange, then repeating).
 - **Community bar.** On a community page the bar now holds Create post (with a plus), About and rules, Flairs, Join / Joined and a "..." menu (add to favourites, add to a custom feed, copy link, open on Reddit). Reddit's own Create post, Join and "..." in the header are hidden because these replace them. Muting a community is not available here yet.
-- **Reading-order guide.** A row of arrows runs across the gap between rows of cards and fades out towards the right, so it is clear where each new row starts.
+- **Reading-order guide.** A faint line with a few arrows at its left sits between rows of cards, so it is clear where each new row starts.
+- **Home button opens Hot.** The Home icon in the left rail goes to /hot/ (your subscribed communities, sorted Hot). Switch it back to Reddit's own home from the Violentmonkey menu ("Home button opens").
 - **One sort control.** Reddit's own sort dropdowns are hidden on feed pages. The sort bar highlights your current sort even when the address has none, and choosing Top shows a second bar: Now, Today, This Week, This Month, This Year, All Time.
 - **Quick start.** Which posts you saved or voted on is remembered between visits, so cards show their gold or green/red state on the first paint, then it is refreshed from Reddit in the background. Reddit's own post-detail requests (which it refuses) are no longer tried.
 - **Look.** Stronger buttons (purple with a gold Create post link and a gold active sort tab), and on community pages the banner fades into the page (a mask on Reddit's own banner image).
