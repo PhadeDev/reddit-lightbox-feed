@@ -38,6 +38,23 @@ Right-hand controls: `#advertise-button`, `#header-action-item-chat-button`, `#c
 
 `<permalink>.json?limit=300&raw_json=1` returns `[postListing, commentListing]`. Comment `t1` items carry `author`, `body_html`, `score`, `created_utc`, `is_submitter`, `distinguished`, `stickied`, `replies`. `more` items are shown as a link to the post on Reddit in v0.1.
 
+## Community page, measured 16/11/2026 (userscript off, viewport 2550 wide, compact view)
+
+- Page chain: `shreddit-app` > `div.grid-container` (grid, columns `272px 2278px`) holding `flex-left-nav-container#left-sidebar-container` and `div#subgrid-container` (flex, max 2278px, padding 0 24px) > `div` (grid, columns `1890px 316px`, likely `.main-container`) holding `main#main-content` and `div#right-sidebar-container` (316px).
+- `shreddit-feed` is `display:flex`. Its children, in order: `article` (one post), `hr`, `shreddit-ad-post`, `in-feed-community-recommendations` (the "Suggested communities" strip, a direct child), `faceplate-loader`, `achievement-events`, `faceplate-partial#partial-more-posts-...` with `slot=load-after`, `loading=programmatic`, `src=/svc/shreddit/community-more-posts/new/?after&t&name&ad_posts_served&n` (infinite scroll).
+- `community-highlight-carousel` is a direct child of `main#main-content`, above the feed.
+- Sort and view controls are `shreddit-sort-dropdown` elements (sort values BEST, HOT, NEW, TOP, RISING; view values `cardView`, `compactView`). The view one sits inside `shreddit-layout-event-setter`.
+- Compact `shreddit-post` (text): light DOM `a[slot=full-post-link]`, `div[slot=thumbnail]` (with `div[data-testid=post-thumbnail]`; a text post shows an svg icon, not an image), `div[slot=credit-bar]` (author link inside `faceplate-hovercard`, `faceplate-timeago[ts]`), title and body in further slots. The vote bar (`rpl-action-bar`) and `shreddit-vote-animations` are in the post's shadow DOM.
+- Left nav: `flex-left-nav-container#left-sidebar-container` (relative, 272 wide) > `div#flex-left-nav-container` (fixed) > `div#flex-left-nav-contents` > `reddit-sidebar-nav#left-sidebar` > `nav[aria-label=Primary]` > `left-nav-top-section` (shadow DOM: `li#home-posts`, `#popular-posts`, `#news-posts`, `#explore-communities`), then games and multireddit sections, then 203 `left-nav-community-item` (each with a `shreddit-favorite-button`). Reddit's own collapse button is `button#flex-nav-collapse-button`.
+- Header: `nav.h-header-large` (56px high) holds the logo, `reddit-search-large` (shadow DOM) and the right-hand group: `a#advertise-button`, `reddit-chat-header-button` (shadow DOM, contains `button#header-action-item-chat-button`), then create post, inbox and the account menu.
+- Theme variables on `html.theme-dark`: `--color-neutral-background:#0E1113`, `--color-neutral-content:#B7CAD4`, `--color-neutral-background-strong:#181C1F`, `--color-primary:#648EFC` and others. Not used by the script, which carries its own palette.
+- Not yet captured: how the community banner and title block above the feed are built, NSFW posts in the feed, card-view posts on the home page.
+
+## Data the script uses
+
+- `/by_id/t3_a,t3_b.json?raw_json=1` (up to 60 ids per request): everything needed for a card (title, selftext, flair, over_18, spoiler, is_gallery, gallery media_metadata, preview images, score, likes, num_comments, permalink).
+- `/subreddits/mine/subscriber.json?limit=100` (paged with `after`): the community list for the rail. Untested live.
+
 ## Open questions
 
 - Where the sidebar lives on feed pages (the script tries `#right-sidebar-container`).

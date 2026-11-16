@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.1.0
+// @version      0.2.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.1.0';
+  var VERSION = '0.2.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -105,6 +105,11 @@
     parent.appendChild(kid.nodeType ? kid : document.createTextNode(String(kid)));
   }
 
+  function setKids(parent) {
+    parent.replaceChildren();
+    for (var i = 1; i < arguments.length; i++) append(parent, arguments[i]);
+  }
+
   function svg(d) {
     var ns = 'http://www.w3.org/2000/svg';
     var s = document.createElementNS(ns, 'svg');
@@ -123,7 +128,9 @@
     link: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
     share: 'M4 12v7h16v-7M12 3v13M7 8l5-5 5 5',
     comment: 'M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z',
-    up: 'M12 19V6M5 12l7-7 7 7'
+    up: 'M12 19V6M5 12l7-7 7 7',
+    down: 'M12 5v13M5 12l7 7 7-7',
+    menu: 'M4 6h16M4 12h16M4 18h16'
   };
 
   /* ------------------------------------------------------------------ */
@@ -174,24 +181,47 @@
   /* Settings and menu                                                  */
   /* ------------------------------------------------------------------ */
 
-  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true) };
+  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true) };
 
   /* ------------------------------------------------------------------ */
   /* Layout (CSS only, scoped to pages that contain a feed)             */
   /* ------------------------------------------------------------------ */
 
-  var LAYOUT_CSS = [
-    'shreddit-ad-post, article:has(shreddit-ad-post), shreddit-sidebar-ad { display: none !important; }',
-    'body:has(shreddit-feed) #right-sidebar-container { display: none !important; }',
-    '#subgrid-container:has(shreddit-feed) { max-width: none !important; width: 100% !important; }',
-    '.main-container:has(shreddit-feed) { display: block !important; max-width: none !important; width: 100% !important; }',
-    'main#main-content:has(shreddit-feed) { max-width: none !important; width: 100% !important; }',
-    'shreddit-feed { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; align-items: start; }',
-    'shreddit-feed > *:not(article) { grid-column: 1 / -1; }',
-    'shreddit-feed > hr { display: none !important; }',
-    'shreddit-feed > article { width: 100% !important; min-width: 0; margin: 0 !important; }',
-    'shreddit-feed shreddit-post > [slot="post-media-container"] { max-height: 340px; overflow: hidden; }'
+  /* Fallback: used when our own cards are off or unavailable. Reddit's own cards, in a grid. */
+  var LAYOUT_FALLBACK = [
+    'html:not(.lbx-own) body:has(shreddit-feed) #right-sidebar-container { display: none !important; }',
+    'html:not(.lbx-own) #subgrid-container:has(shreddit-feed) { max-width: none !important; width: 100% !important; }',
+    'html:not(.lbx-own) .main-container:has(shreddit-feed) { display: block !important; max-width: none !important; width: 100% !important; }',
+    'html:not(.lbx-own) main#main-content:has(shreddit-feed) { max-width: none !important; width: 100% !important; }',
+    'html:not(.lbx-own) shreddit-feed { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; align-items: start; }',
+    'html:not(.lbx-own) shreddit-feed > *:not(article) { grid-column: 1 / -1; }',
+    'html:not(.lbx-own) shreddit-feed > hr { display: none !important; }',
+    'html:not(.lbx-own) shreddit-feed > article { width: 100% !important; min-width: 0; margin: 0 !important; }',
+    'html:not(.lbx-own) shreddit-feed shreddit-post > [slot="post-media-container"] { max-height: 340px; overflow: hidden; }'
   ].join('\n');
+
+  /* Own-card mode: Reddit keeps loading posts invisibly (the load-after placeholder stays on screen), we draw the cards. */
+  var LAYOUT_OWN = [
+    'shreddit-ad-post, article:has(shreddit-ad-post), shreddit-sidebar-ad { display: none !important; }',
+    'html.lbx-wait shreddit-feed { visibility: hidden; }',
+    'html.lbx-own body:has(shreddit-feed) #right-sidebar-container { display: none !important; }',
+    'html.lbx-own body:has(shreddit-feed) community-highlight-carousel { display: none !important; }',
+    'html.lbx-own body:has(shreddit-feed) shreddit-layout-event-setter { display: none !important; }',
+    'html.lbx-own #subgrid-container:has(shreddit-feed) { max-width: none !important; width: 100% !important; }',
+    'html.lbx-own #subgrid-container:has(shreddit-feed) > .main-container { flex: 1 1 auto; min-width: 0; }',
+    'html.lbx-own .main-container:has(shreddit-feed) { display: block !important; max-width: none !important; width: 100% !important; }',
+    'html.lbx-own main#main-content:has(shreddit-feed) { max-width: none !important; width: 100% !important; }',
+    'html.lbx-own shreddit-feed { display: block !important; }',
+    'html.lbx-own shreddit-feed > *:not(faceplate-partial[slot="load-after"]) { display: none !important; }',
+    'html.lbx-own shreddit-feed > faceplate-partial[slot="load-after"] { display: block !important; min-height: 4px; }',
+    '@media (min-width: 900px) {',
+    '  html.lbx-rail div:has(> #left-sidebar-container) { grid-template-columns: var(--lbx-rail-w, 64px) minmax(0, 1fr) !important; }',
+    '  html.lbx-rail #flex-left-nav-container { display: none !important; }',
+    '  html.lbx-rail #left-sidebar-container { width: var(--lbx-rail-w, 64px) !important; }',
+    '}'
+  ].join('\n');
+
+  var LAYOUT_CSS = LAYOUT_FALLBACK + '\n' + LAYOUT_OWN;
 
   /* ------------------------------------------------------------------ */
   /* Lightbox styles (inside a shadow root, so Reddit CSS cannot leak in) */
@@ -366,11 +396,11 @@
     ui.next.disabled = S.idx < 0 || S.idx >= S.list.length - 1;
     ui.count.textContent = S.idx >= 0 ? (S.idx + 1) + ' of ' + S.list.length : '';
     ui.open.setAttribute('href', location.origin + pl);
-    ui.postPane.replaceChildren(
+    setKids(ui.postPane,
       el('h2', { text: titleHint || 'Loading...' }),
       el('div', { class: 'skel', style: 'width:60%' }), el('div', { class: 'skel', style: 'width:90%' }), el('div', { class: 'skel', style: 'width:75%' })
     );
-    ui.cmPane.replaceChildren(el('div', { class: 'skel', style: 'width:40%' }), el('div', { class: 'skel' }), el('div', { class: 'skel', style: 'width:85%' }));
+    setKids(ui.cmPane,el('div', { class: 'skel', style: 'width:40%' }), el('div', { class: 'skel' }), el('div', { class: 'skel', style: 'width:85%' }));
     ui.postPane.scrollTop = 0;
     ui.cmPane.scrollTop = 0;
     ui.panel.scrollTop = 0;
@@ -393,8 +423,8 @@
     document.body.style.overflow = S.prevBody;
     var pl = S.list[S.idx];
     if (pl) {
-      var card = document.querySelector('shreddit-feed shreddit-post[permalink="' + pl.replace(/"/g, '\\"') + '"]');
-      if (card) card.scrollIntoView({ block: 'center' });
+      var card = cardForPl(pl);
+      if (card && card.scrollIntoView) card.scrollIntoView({ block: 'center' });
     }
     if (S.lastFocus && S.lastFocus.focus) { try { S.lastFocus.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
@@ -404,8 +434,7 @@
     if (S.idx < 0 || n < 0 || n >= S.list.length) return;
     S.idx = n;
     var pl = S.list[n];
-    var card = document.querySelector('shreddit-feed shreddit-post[permalink="' + pl.replace(/"/g, '\\"') + '"]');
-    show(pl, card && card.getAttribute('post-title'));
+    show(pl, titleForPl(pl));
   }
 
   function copyLink() {
@@ -522,7 +551,7 @@
     if (p.over_18) chips.push(el('span', { class: 'chip nsfw', text: 'NSFW' }));
     if (p.spoiler) chips.push(el('span', { class: 'chip', text: 'Spoiler' }));
     if (p.stickied) chips.push(el('span', { class: 'chip', text: 'Pinned' }));
-    ui.postPane.replaceChildren(
+    setKids(ui.postPane,
       el('div', { class: 'meta' }, avatar(p.subreddit),
         el('a', { class: 'u', href: '/r/' + p.subreddit + '/', text: 'r/' + p.subreddit }), dot(), userLink(p.author), dot(),
         el('span', { text: ago(p.created_utc) }),
@@ -537,7 +566,7 @@
     var thread = el('div', { class: 'thread' });
     d.comments.forEach(function (c) { var n = commentNode(c, pl); if (n) thread.appendChild(n); });
     if (!d.comments.length) thread.appendChild(el('div', { class: 'note', text: 'No comments yet.' }));
-    ui.cmPane.replaceChildren(
+    setKids(ui.cmPane,
       el('div', { class: 'ch' }, el('h3', { text: fmt(p.num_comments) + ' comments' }), el('span', { text: 'Sorted by best. Read-only here.' })),
       el('a', { class: 'reply', href: link, target: '_blank', rel: 'noopener', text: 'Reply on Reddit' }),
       thread
@@ -546,12 +575,12 @@
 
   function renderError(e, pl, titleHint) {
     var link = location.origin + pl;
-    ui.postPane.replaceChildren(
+    setKids(ui.postPane,
       el('h2', { text: titleHint || 'This post' }),
       el('div', { class: 'err' }, el('b', { text: 'Could not load this post here. ' }), String(e && e.message ? e.message : e),
         el('br'), el('a', { class: 'reply', href: link, target: '_blank', rel: 'noopener', text: 'Open it on Reddit instead' }))
     );
-    ui.cmPane.replaceChildren();
+    setKids(ui.cmPane);
   }
 
   function commentNode(c, pl) {
@@ -582,6 +611,561 @@
   /* ------------------------------------------------------------------ */
   /* Opening a post from the feed                                       */
   /* ------------------------------------------------------------------ */
+
+  /* ------------------------------------------------------------------ */
+  /* Own cards: drawn from Reddit's post data, in the mock-up style      */
+  /* ------------------------------------------------------------------ */
+
+  var TOK = [
+    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#ff7a45;--down:#7aa8ff;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
+    ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#c8431a;--down:#2f5fc4}',
+    '*{box-sizing:border-box}',
+    'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}',
+    ':focus-visible{outline:2px solid var(--accent);outline-offset:2px}',
+    '.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}'
+  ].join('\n') + '\n';
+
+  var FEED_CSS = TOK + [
+    '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:stretch;padding:4px 0 24px}',
+    '.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;min-width:0;cursor:pointer;transition:border-color .15s}',
+    '.card:hover{border-color:var(--accent)}',
+    '.thumb{height:150px;background:var(--surface2);position:relative;flex:none;overflow:hidden}',
+    '.thumb img,.thumb svg.art{display:block;width:100%;height:100%}',
+    '.thumb img{object-fit:cover}',
+    '.badge{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;padding:1px 8px;border-radius:99px}',
+    '.cmain{padding:12px 14px 10px;display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}',
+    '.meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);flex-wrap:wrap;min-width:0}',
+    '.av{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;color:#fff;flex:none}',
+    '.sub{font-weight:600;color:var(--fg);text-decoration:none}',
+    '.sub:hover{color:var(--accent);text-decoration:underline}',
+    'h3{margin:0;font-size:15px;line-height:1.35;font-weight:600;overflow-wrap:anywhere;text-wrap:balance}',
+    'h3 a{text-decoration:none;color:inherit}',
+    '.flairs{display:flex;gap:6px;flex-wrap:wrap}',
+    '.chip{font-size:11px;font-weight:500;padding:1px 8px;border-radius:99px;background:var(--accent-bg);color:var(--fg)}',
+    '.chip.nsfw{background:#8E1537;color:#fff}',
+    '.snip{margin:0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}',
+    '.nothumb .snip{-webkit-line-clamp:5}',
+    '.acts{display:flex;align-items:center;gap:4px;margin-top:auto;padding-top:6px;flex-wrap:wrap}',
+    '.vote{display:inline-flex;align-items:center;background:var(--surface2);border-radius:99px}',
+    '.vb{width:30px;height:28px;display:grid;place-items:center;color:var(--muted);border-radius:99px}',
+    '.vb:hover{color:var(--fg)}',
+    '.vb.up.on{color:var(--up)}.vb.dn.on{color:var(--down)}',
+    '.sc{min-width:30px;text-align:center;font-weight:600;font-size:13px;font-variant-numeric:tabular-nums}',
+    '.sc.up{color:var(--up)}.sc.dn{color:var(--down)}',
+    '.ab{height:28px;padding:0 9px;border-radius:99px;display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}',
+    '.ab:hover{background:var(--surface2);color:var(--fg)}',
+    '.ab .ic{width:16px;height:16px}',
+    '.sentinel{height:2px}',
+    '.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;background:var(--fg);color:var(--surface);padding:8px 16px;border-radius:99px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:calc(100vw - 32px)}',
+    '@media (prefers-reduced-motion:reduce){*{transition:none!important}}'
+  ].join('\n');
+
+  function adopt(rootNode, css) {
+    try {
+      var sh = new CSSStyleSheet();
+      sh.replaceSync(css);
+      rootNode.adoptedStyleSheets = [sh];
+    } catch (e) {
+      var st = document.createElement('style');
+      st.textContent = css;
+      rootNode.appendChild(st);
+    }
+  }
+
+  function rng(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function docEl() { return document.documentElement; }
+
+  function nsfwOf(p) {
+    var xp = p.crosspost_parent_list && p.crosspost_parent_list[0];
+    return !!(p.over_18 || (xp && xp.over_18));
+  }
+
+  function thumbFor(p, depth) {
+    if (!p || p.over_18 || p.spoiler) return '';
+    if (p.is_gallery && p.gallery_data && p.gallery_data.items && p.gallery_data.items.length && p.media_metadata) {
+      var m = p.media_metadata[p.gallery_data.items[0].media_id];
+      if (m && m.status === 'valid') {
+        var pv = (m.p || []).filter(function (x) { return x.x >= 300; })[0];
+        var gu = (pv && pv.u) || (m.s && (m.s.u || m.s.gif));
+        if (gu) return gu;
+      }
+    }
+    var im = p.preview && p.preview.images && p.preview.images[0];
+    if (im) {
+      var rs = (im.resolutions || []).filter(function (x) { return x.width >= 320; })[0];
+      var cand = (rs && rs.url) || (im.source && im.source.url);
+      if (cand) return cand;
+    }
+    if (/^https?:/.test(p.thumbnail || '')) return p.thumbnail;
+    var xp = p.crosspost_parent_list && p.crosspost_parent_list[0];
+    if (xp && !depth) return thumbFor(xp, 1);
+    return '';
+  }
+
+  function snippetOf(p) {
+    if (nsfwOf(p)) return '';
+    var t = p.selftext || '';
+    var xp = p.crosspost_parent_list && p.crosspost_parent_list[0];
+    if (!t && xp) t = xp.selftext || '';
+    t = t.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~`>#]/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+    return t.length > 260 ? t.slice(0, 257) + '...' : t;
+  }
+
+  function artNode(p) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var h = hashStr(p.subreddit || 'x') % 360;
+    var r = rng(hashStr(p.name || 'x'));
+    var s = document.createElementNS(ns, 'svg');
+    s.setAttribute('viewBox', '0 0 320 200');
+    s.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    s.setAttribute('class', 'art');
+    function mk(tag, attrs) {
+      var e = document.createElementNS(ns, tag);
+      Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+      return e;
+    }
+    var gid = 'g' + hashStr(p.name || 'x');
+    var defs = mk('defs', {});
+    var lg = mk('linearGradient', { id: gid, x1: '0', y1: '0', x2: '1', y2: '1' });
+    lg.appendChild(mk('stop', { offset: '0', 'stop-color': 'hsl(' + h + ' 48% 30%)' }));
+    lg.appendChild(mk('stop', { offset: '1', 'stop-color': 'hsl(' + ((h + 45) % 360) + ' 52% 15%)' }));
+    defs.appendChild(lg);
+    s.appendChild(defs);
+    s.appendChild(mk('rect', { width: '320', height: '200', fill: 'url(#' + gid + ')' }));
+    for (var i = 0; i < 6; i++) {
+      s.appendChild(mk('circle', { cx: String(Math.round(r() * 320)), cy: String(Math.round(r() * 200)), r: String(Math.round(18 + r() * 60)), fill: 'hsl(' + Math.round(h + r() * 70) + ' 62% 58%)', opacity: (0.1 + r() * 0.16).toFixed(2) }));
+    }
+    if (p.is_video) {
+      s.appendChild(mk('circle', { cx: '160', cy: '100', r: '26', fill: '#000', opacity: '.55' }));
+      s.appendChild(mk('path', { d: 'M152 87l22 13-22 13z', fill: '#fff' }));
+    }
+    return s;
+  }
+
+  var own = {
+    feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
+    shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
+    busy: false, failed: '', failAt: 0, mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+  };
+
+  function toast(msg) {
+    if (!own.toastEl) return;
+    own.toastEl.textContent = msg;
+    own.toastEl.style.display = 'block';
+    clearTimeout(own.toastT);
+    own.toastT = setTimeout(function () { own.toastEl.style.display = 'none'; }, 3200);
+  }
+
+  function badgeText(p) {
+    if (nsfwOf(p)) return 'NSFW';
+    if (p.spoiler) return 'Spoiler';
+    if (p.is_gallery) return ((p.gallery_data && p.gallery_data.items && p.gallery_data.items.length) || '') + ' images';
+    if (p.is_video) return 'Video';
+    if (p.crosspost_parent_list && p.crosspost_parent_list.length) return 'Crosspost';
+    if (!p.is_self && p.domain && !/(^|\.)(reddit\.com|redd\.it)$/i.test(p.domain) && !/^self\./.test(p.domain)) return p.domain;
+    return '';
+  }
+
+  function voteBox(p) {
+    var v = own.votes[p.name] || 0;
+    var score = (p.score || 0) + (v - (own.v0[p.name] || 0));
+    return el('span', { class: 'vote', role: 'group', 'aria-label': 'Vote' },
+      el('button', { class: 'vb up' + (v > 0 ? ' on' : ''), type: 'button', 'data-act': 'up', 'aria-label': 'Upvote', 'aria-pressed': String(v > 0) }, svg(IC.up)),
+      el('span', { class: 'sc' + (v ? (v > 0 ? ' up' : ' dn') : ''), text: p.hide_score && !v ? '•' : fmt(score) }),
+      el('button', { class: 'vb dn' + (v < 0 ? ' on' : ''), type: 'button', 'data-act': 'down', 'aria-label': 'Downvote', 'aria-pressed': String(v < 0) }, svg(IC.down)));
+  }
+
+  function cardEl(p) {
+    var thumb = thumbFor(p);
+    var nsfw = nsfwOf(p);
+    var hasT = !!thumb || nsfw || !!p.is_video || !!p.is_gallery;
+    var badge = badgeText(p);
+    var media = null;
+    if (hasT) {
+      var inner;
+      if (thumb) {
+        inner = el('img', { src: thumb, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
+        inner.addEventListener('error', function () { if (inner.replaceWith) inner.replaceWith(artNode(p)); });
+      } else inner = artNode(p);
+      media = el('div', { class: 'thumb' }, inner, badge ? el('span', { class: 'badge', text: badge }) : null);
+    }
+    var chips = [];
+    if (p.link_flair_text) chips.push(el('span', { class: 'chip', text: p.link_flair_text }));
+    if (nsfw) chips.push(el('span', { class: 'chip nsfw', text: 'NSFW' }));
+    if (p.stickied) chips.push(el('span', { class: 'chip', text: 'Pinned' }));
+    var av = el('span', { class: 'av', text: (p.subreddit || '?').charAt(0).toUpperCase() });
+    av.style.background = 'hsl(' + (hashStr(p.subreddit || '') % 360) + ' 45% 34%)';
+    var snip = snippetOf(p);
+    own.v0[p.name] = p.likes === true ? 1 : (p.likes === false ? -1 : 0);
+    own.votes[p.name] = own.v0[p.name];
+    return el('article', { class: 'card' + (hasT ? '' : ' nothumb'), 'data-id': p.name, tabindex: '0', role: 'listitem', 'aria-label': p.title || '' },
+      media,
+      el('div', { class: 'cmain' },
+        el('div', { class: 'meta' }, av, el('a', { class: 'sub', href: '/r/' + p.subreddit + '/', text: 'r/' + p.subreddit }), dot(), el('span', { text: ago(p.created_utc) })),
+        el('h3', {}, el('a', { class: 'tl', href: p.permalink, text: p.title || '' })),
+        chips.length ? el('div', { class: 'flairs' }, chips) : null,
+        snip ? el('p', { class: 'snip', text: snip }) : null,
+        el('div', { class: 'acts' }, voteBox(p),
+          el('button', { class: 'ab', type: 'button', 'data-act': 'open', 'aria-label': fmt(p.num_comments) + ' comments' }, svg(IC.comment), el('span', { text: fmt(p.num_comments) })))));
+  }
+
+  function deepFind(start, test) {
+    var queue = [start];
+    var guard = 0;
+    while (queue.length && guard++ < 4000) {
+      var n = queue.shift();
+      if (n.nodeType === 1 && test(n)) return n;
+      var kids = n.children ? Array.prototype.slice.call(n.children) : [];
+      if (n.shadowRoot) kids = kids.concat(Array.prototype.slice.call(n.shadowRoot.children));
+      kids.forEach(function (k) { queue.push(k); });
+    }
+    return null;
+  }
+
+  function findVoteButton(id, dir) {
+    var orig = document.querySelector('shreddit-post[id="' + id + '"]');
+    if (!orig) return null;
+    var word = dir === 'up' ? 'upvote' : 'downvote';
+    var re = new RegExp('(^|[^a-z])' + word, 'i');
+    return deepFind(orig, function (n) {
+      return n.tagName === 'BUTTON' && (n.hasAttribute(word) || re.test(n.getAttribute('aria-label') || ''));
+    });
+  }
+
+  function vote(id, dir, card) {
+    var p = own.posts.get(id);
+    if (!p) return;
+    var cur = own.votes[id] || 0;
+    var want = dir === 'up' ? 1 : -1;
+    var btn = findVoteButton(id, dir);
+    if (!btn) { toast('Voting from here is not available yet. Open the post to vote on Reddit.'); log('vote button not found', dir); return; }
+    try { btn.click(); } catch (e) { log('vote click failed:', e); return; }
+    own.votes[id] = cur === want ? 0 : want;
+    var old = card.querySelector('.vote');
+    if (old) old.replaceWith(voteBox(p));
+    log('vote sent', dir);
+  }
+
+  function openOwn(id) {
+    var p = own.posts.get(id);
+    if (!p) return;
+    S.list = own.shown.map(function (i) { return own.posts.get(i).permalink; });
+    S.idx = own.shown.indexOf(id);
+    show(p.permalink, p.title);
+  }
+
+  function onOwnClick(e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var card = t.closest('.card');
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+    var btn = t.closest('[data-act]');
+    if (btn) {
+      var a = btn.getAttribute('data-act');
+      if (a === 'up' || a === 'down') { e.preventDefault(); vote(id, a, card); return; }
+      if (a === 'open') { e.preventDefault(); openOwn(id); return; }
+    }
+    if (t.closest('a.sub')) return;
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    openOwn(id);
+  }
+
+  function onOwnKey(e) {
+    if ((e.key === 'Enter') && e.target && e.target.classList && e.target.classList.contains('card')) {
+      e.preventDefault();
+      openOwn(e.target.getAttribute('data-id'));
+    }
+  }
+
+  function fetchByIds(ids) {
+    var url = '/by_id/' + ids.join(',') + '.json?raw_json=1';
+    return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('Reddit answered HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      var m = new Map();
+      ((j && j.data && j.data.children) || []).forEach(function (c) { if (c && c.data && c.data.name) m.set(c.data.name, c.data); });
+      log('card data:', m.size, 'of', ids.length);
+      return m;
+    });
+  }
+
+  function clearCards() {
+    own.shown = []; own.have = {}; own.cards = {}; own.busy = false;
+    if (own.grid) setKids(own.grid);
+    docEl().classList.remove('lbx-own');
+  }
+
+  function resetOwn() {
+    if (own.mo) { own.mo.disconnect(); own.mo = null; }
+    if (own.io) { own.io.disconnect(); own.io = null; }
+    clearCards();
+  }
+
+  function ensureHost(f) {
+    if (!own.host) {
+      own.host = el('div', { id: 'lbx-feed-host' });
+      own.host.style.cssText = 'display:block;width:100%;';
+      own.root = own.host.attachShadow({ mode: 'open' });
+      adopt(own.root, FEED_CSS);
+      own.grid = el('div', { class: 'grid', role: 'list' });
+      own.sentinel = el('div', { class: 'sentinel' });
+      own.toastEl = el('div', { class: 'toast', role: 'status' });
+      own.toastEl.style.display = 'none';
+      own.root.appendChild(own.grid);
+      own.root.appendChild(own.sentinel);
+      own.root.appendChild(own.toastEl);
+      own.root.addEventListener('click', onOwnClick);
+      own.root.addEventListener('keydown', onOwnKey);
+    }
+    if (!own.host.isConnected || own.host.parentNode !== f.parentNode) f.parentNode.insertBefore(own.host, f);
+    own.host.setAttribute('data-theme', themeNow());
+  }
+
+  function pokeMore() {
+    var f = own.feed;
+    if (!f || Date.now() - own.pokeAt < 4000) return;
+    var p = f.querySelector('faceplate-partial[slot="load-after"]');
+    if (!p) return;
+    own.pokeAt = Date.now();
+    var n = f.querySelectorAll('shreddit-post').length;
+    setTimeout(function () {
+      if (f.querySelectorAll('shreddit-post').length > n) return;
+      try {
+        if (typeof p.load === 'function') { p.load(); log('asked the load-after placeholder to load'); }
+        else { p.setAttribute('loading', 'eager'); log('set the load-after placeholder to eager'); }
+      } catch (err) { log('load more failed:', err); }
+    }, 1500);
+  }
+
+  function nearBottom() {
+    return own.sentinel && own.sentinel.getBoundingClientRect().top < innerHeight + 1500;
+  }
+
+  function watchSentinel() {
+    if (own.io || typeof IntersectionObserver !== 'function') return;
+    own.io = new IntersectionObserver(function (es) {
+      if (es.some(function (x) { return x.isIntersecting; })) pokeMore();
+    }, { rootMargin: '1500px 0px' });
+    own.io.observe(own.sentinel);
+  }
+
+  function scanFeed() {
+    if (!cfg.cards) return;
+    var f = document.querySelector('shreddit-feed');
+    if (f !== own.feed) {
+      resetOwn();
+      own.feed = f;
+      if (f && typeof MutationObserver === 'function') {
+        own.mo = new MutationObserver(function () { clearTimeout(own.moT); own.moT = setTimeout(scanFeed, 150); });
+        own.mo.observe(f, { childList: true, subtree: true });
+      }
+    }
+    if (!f) { docEl().classList.remove('lbx-wait'); return; }
+    if (own.failed && Date.now() - own.failAt < 30000) return;
+    var ids = [], seen = {};
+    Array.prototype.forEach.call(f.querySelectorAll('shreddit-post'), function (p) {
+      var id = p.getAttribute('id');
+      if (/^t3_[a-z0-9]+$/i.test(id || '') && !seen[id]) { seen[id] = 1; ids.push(id); }
+    });
+    if (!ids.length) return;
+    if (own.shown.length && ids.indexOf(own.shown[0]) < 0) clearCards();
+    ensureHost(f);
+    if (own.shown.length && own.grid.childElementCount !== own.shown.length) {
+      setKids(own.grid);
+      own.shown.forEach(function (id) { own.grid.appendChild(own.cards[id]); });
+    }
+    if (own.busy) return;
+    var batch = ids.filter(function (id) { return !own.have[id]; }).slice(0, 60);
+    if (!batch.length) { if (own.shown.length && nearBottom()) pokeMore(); return; }
+    own.busy = true;
+    batch.forEach(function (id) { own.have[id] = 1; });
+    fetchByIds(batch).then(function (map) {
+      batch.forEach(function (id) {
+        var p = map.get(id);
+        if (!p) return;
+        own.posts.set(id, p);
+        own.plToId[p.permalink] = id;
+        var c = cardEl(p);
+        own.cards[id] = c;
+        own.grid.appendChild(c);
+        own.shown.push(id);
+      });
+      own.busy = false;
+      if (own.shown.length) {
+        docEl().classList.add('lbx-own');
+        docEl().classList.remove('lbx-wait');
+        watchSentinel();
+      }
+      setTimeout(scanFeed, 60);
+    }).catch(function (err) {
+      own.busy = false;
+      own.failed = String((err && err.message) || err);
+      own.failAt = Date.now();
+      log('own cards unavailable, showing Reddit cards instead:', own.failed);
+      batch.forEach(function (id) { delete own.have[id]; });
+      clearCards();
+      docEl().classList.remove('lbx-wait');
+    });
+  }
+
+  function cardForPl(pl) {
+    var id = own.plToId[pl];
+    if (id && own.cards[id]) return own.cards[id];
+    return document.querySelector('shreddit-feed shreddit-post[permalink="' + String(pl).replace(/\/+$/, '').replace(/"/g, '\\"') + '"]');
+  }
+
+  function titleForPl(pl) {
+    var id = own.plToId[pl];
+    if (id && own.posts.get(id)) return own.posts.get(id).title;
+    var c = document.querySelector('shreddit-feed shreddit-post[permalink="' + String(pl).replace(/\/+$/, '').replace(/"/g, '\\"') + '"]');
+    return c ? c.getAttribute('post-title') : null;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Left icon rail                                                      */
+  /* ------------------------------------------------------------------ */
+
+  var RAIL_CSS = TOK + [
+    ':host{display:block}',
+    '@media (max-width:899px){:host{display:none}}',
+    '.rail{height:100%;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--line)}',
+    '.top{display:flex;align-items:center;padding:8px 14px}',
+    '.tg{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}',
+    '.tg:hover{background:var(--surface2);color:var(--fg)}',
+    '.list{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 10px 16px;scrollbar-width:thin}',
+    '.it{display:flex;align-items:center;gap:12px;height:40px;padding:0 8px;border-radius:8px;color:var(--muted);text-decoration:none;white-space:nowrap}',
+    '.it:hover{background:var(--surface2);color:var(--fg)}',
+    '.it.on{background:var(--accent-bg);color:var(--fg)}',
+    '.it .ic{width:22px;height:22px}',
+    '.lb{overflow:hidden;text-overflow:ellipsis;min-width:0}',
+    '.avi,.avl{width:24px;height:24px;border-radius:50%;flex:none;object-fit:cover}',
+    '.avl{display:grid;place-items:center;font-size:11px;font-weight:600;color:#fff}',
+    '.sep{height:1px;background:var(--line);margin:8px 6px}',
+    'h4{margin:12px 8px 4px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}',
+    '.note{padding:8px;font-size:12px;color:var(--muted)}',
+    '.collapsed .lb,.collapsed h4,.collapsed .note{display:none}',
+    '.collapsed .it{justify-content:center;padding:0}',
+    '.collapsed .top{justify-content:center;padding:8px 0}'
+  ].join('\n');
+
+  var RAIL_NAV = [
+    { t: 'Home', h: '/', d: 'M3 11l9-8 9 8M5 10v10h14V10' },
+    { t: 'Popular', h: '/r/popular/', d: 'M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z' },
+    { t: 'News', h: '/news/', d: 'M5 4h12v16H5zM8 8h6M8 12h6M8 16h4' },
+    { t: 'Explore', h: '/explore/', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15 9l-2 5-5 2 2-5z' }
+  ];
+
+  var rail = { host: null, root: null, wrap: null, list: null, open: !!gm.get('railOpen', false), subs: null, err: '', path: '' };
+
+  function loadSubs() {
+    var out = [];
+    function page(after, n) {
+      var url = '/subreddits/mine/subscriber.json?limit=100&raw_json=1' + (after ? '&after=' + encodeURIComponent(after) : '');
+      return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+        if (!r.ok) throw new Error('Reddit answered HTTP ' + r.status);
+        return r.json();
+      }).then(function (j) {
+        var d = (j && j.data) || {};
+        (d.children || []).forEach(function (c) {
+          var x = c.data || {};
+          if (!x.display_name) return;
+          var icon = x.over18 ? '' : (x.community_icon || x.icon_img || '');
+          out.push({ n: x.display_name, u: x.url || ('/r/' + x.display_name + '/'), i: /^https?:/.test(icon) ? icon : '', fav: !!x.user_has_favorited });
+        });
+        if (d.after && n < 4) return page(d.after, n + 1);
+        out.sort(function (a, b) { return (b.fav - a.fav) || (a.n.toLowerCase() < b.n.toLowerCase() ? -1 : 1); });
+        log('rail communities:', out.length);
+        return out;
+      });
+    }
+    return page('', 0);
+  }
+
+  function railItem(icon, label, href, on) {
+    return el('a', { class: 'it' + (on ? ' on' : ''), href: href, title: label }, icon, el('span', { class: 'lb', text: label }));
+  }
+
+  function railAvatar(s) {
+    var letter = el('span', { class: 'avl', text: s.n.charAt(0).toUpperCase() });
+    letter.style.background = 'hsl(' + (hashStr(s.n) % 360) + ' 45% 34%)';
+    if (!s.i) return letter;
+    var img = el('img', { class: 'avi', src: s.i, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
+    img.addEventListener('error', function () { if (img.replaceWith) img.replaceWith(letter); });
+    return img;
+  }
+
+  function renderRail() {
+    if (!rail.list) return;
+    var path = location.pathname.toLowerCase();
+    rail.path = location.pathname;
+    function active(h) { return h === '/' ? path === '/' : path.indexOf(h.toLowerCase().replace(/\/$/, '')) === 0; }
+    var kids = RAIL_NAV.map(function (n) { return railItem(svg(n.d), n.t, n.h, active(n.h)); });
+    kids.push(el('div', { class: 'sep' }));
+    kids.push(el('h4', { text: 'Your communities' }));
+    if (rail.subs && rail.subs.length) {
+      rail.subs.forEach(function (s) { kids.push(railItem(railAvatar(s), 'r/' + s.n, s.u, active(s.u))); });
+    } else if (rail.err) {
+      kids.push(el('div', { class: 'note', text: 'Your communities could not be loaded (' + rail.err + ').' }));
+    } else {
+      kids.push(el('div', { class: 'note', text: 'Loading...' }));
+    }
+    setKids(rail.list, kids);
+    rail.wrap.className = 'rail' + (rail.open ? '' : ' collapsed');
+    docEl().style.setProperty('--lbx-rail-w', rail.open ? '232px' : '64px');
+  }
+
+  function toggleRail() {
+    rail.open = !rail.open;
+    gm.set('railOpen', rail.open);
+    renderRail();
+  }
+
+  function buildRail() {
+    rail.host = el('div', { id: 'lbx-rail-host' });
+    rail.host.style.cssText = 'position:fixed;left:0;top:56px;bottom:0;width:var(--lbx-rail-w,64px);z-index:3;';
+    rail.root = rail.host.attachShadow({ mode: 'open' });
+    adopt(rail.root, RAIL_CSS);
+    rail.list = el('div', { class: 'list' });
+    rail.wrap = el('nav', { class: 'rail', 'aria-label': 'Communities' },
+      el('div', { class: 'top' }, el('button', { class: 'tg', type: 'button', 'aria-label': 'Expand or collapse the left menu', onclick: toggleRail }, svg(IC.menu))),
+      rail.list);
+    rail.root.appendChild(rail.wrap);
+    document.body.appendChild(rail.host);
+    docEl().classList.add('lbx-rail');
+    renderRail();
+    loadSubs().then(function (list) { rail.subs = list; renderRail(); }).catch(function (e) {
+      rail.err = String((e && e.message) || e);
+      log('rail communities failed:', rail.err);
+      renderRail();
+    });
+  }
+
+  function ensureRail() {
+    if (!cfg.rail || !document.body) return;
+    if (!rail.host) buildRail();
+    else if (!rail.host.isConnected) document.body.appendChild(rail.host);
+    rail.host.setAttribute('data-theme', themeNow());
+    if (rail.path !== location.pathname) renderRail();
+  }
+
+  function tick() {
+    try {
+      if (cfg.rail) ensureRail();
+      if (cfg.cards) scanFeed();
+      if (host) host.setAttribute('data-theme', themeNow());
+    } catch (err) { log('tick error:', err); }
+  }
 
   var STOP_TAGS = { BUTTON: 1, INPUT: 1, SELECT: 1, TEXTAREA: 1, 'RPL-DROPDOWN': 1, 'RPL-MENU': 1, 'SHREDDIT-PLAYER': 1,
     'SHREDDIT-POST-OVERFLOW-MENU': 1, 'SHREDDIT-JOIN-BUTTON': 1 };
@@ -614,7 +1198,7 @@
   function onClick(e) {
     try {
       if (!cfg.lightbox || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-      if (S.open) return;
+      if (S.open || docEl().classList.contains('lbx-own')) return;
       var path = e.composedPath ? e.composedPath() : [];
       var card = null;
       for (var i = 0; i < path.length; i++) { if (path[i].tagName === 'SHREDDIT-POST') { card = path[i]; break; } }
@@ -674,6 +1258,9 @@
         Array.prototype.slice.call(c.children, 0, 8).forEach(function (k) { o.push(T + '  ' + box(k)); });
       });
     }
+    o.push(T + 'own cards shown=' + own.shown.length + ' failed=' + (own.failed || 'no') + ' html.lbx-own=' + docEl().classList.contains('lbx-own') +
+      ' rail=' + (rail.host ? 'built' : 'no') + ' communities=' + (rail.subs ? rail.subs.length : 'n/a') + (rail.err ? ' railError=' + rail.err : '') +
+      ' cfg=' + JSON.stringify(cfg));
     o.push(T + 'recent log:');
     LOG.slice(-15).forEach(function (x) { o.push(T + '  ' + x); });
     return o.join('\n');
@@ -683,15 +1270,206 @@
   /* Start                                                              */
   /* ------------------------------------------------------------------ */
 
+  /* ------------------------------------------------------------------ */
+  /* Structure report: a richer, redacted snapshot used to design the    */
+  /* next version. Names of attributes only, no post text or usernames.  */
+  /* ------------------------------------------------------------------ */
+
+  function structureReport() {
+    var T = '[lightbox] ';
+    var o = [];
+    function add(s) { o.push(T + s); }
+    function nm(e) { return e.tagName.toLowerCase() + (e.id ? '#' + String(e.id).slice(0, 24) : ''); }
+    function box(e) {
+      var r = e.getBoundingClientRect();
+      return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+    }
+    var SAFE = /^(view-type|post-type|domain|nsfw|is-nsfw|spoiler|is-spoiler|promoted|is-promoted|stickied|is-stickied|locked|archived|item-state|feedindex|is-.*|.*nsfw.*|.*adult.*|.*over.?18.*)$/i;
+    function an(e, withVals) {
+      return Array.prototype.map.call(e.attributes, function (a) {
+        if (a.name === 'class' || a.name === 'style') return '';
+        var v = '';
+        if (withVals && SAFE.test(a.name)) v = '=' + String(a.value).slice(0, 20);
+        else if (a.name === 'slot' || a.name === 'role' || a.name === 'type' || a.name === 'data-testid') v = '=' + String(a.value).slice(0, 24);
+        return a.name + v;
+      }).filter(Boolean).join(',');
+    }
+    function sk(e, dp, out, max) {
+      if (out.length >= max || dp > 4) return;
+      var t = e.tagName.toLowerCase();
+      var extra = '';
+      if (t === 'img') {
+        try {
+          var u = new URL(e.currentSrc || e.getAttribute('src') || '', location.href);
+          extra = ' src=' + u.hostname + '/' + (u.pathname.split('/')[1] || '');
+        } catch (x) { extra = ' src=?'; }
+      }
+      var kids = e.children.length;
+      var a = an(e, false);
+      var txt = (!kids && e.textContent && e.textContent.trim()) ? ' text=' + e.textContent.trim().length + 'ch' : '';
+      out.push('  '.repeat(dp) + t + (a ? ' [' + a + ']' : '') + extra + txt);
+      Array.prototype.slice.call(e.children, 0, 8).forEach(function (c) { sk(c, dp + 1, out, max); });
+    }
+    function allRoots() {
+      var r = [document];
+      for (var i = 0; i < r.length; i++) {
+        r[i].querySelectorAll('*').forEach(function (e) { if (e.shadowRoot) r.push(e.shadowRoot); });
+      }
+      return r;
+    }
+    function upOne(e) { return e.parentElement || (e.getRootNode && e.getRootNode().host) || null; }
+    function firstTextHit(re) {
+      var roots = allRoots();
+      for (var i = 0; i < roots.length; i++) {
+        var w = document.createTreeWalker(roots[i], NodeFilter.SHOW_TEXT);
+        var n;
+        while ((n = w.nextNode())) {
+          if (re.test(n.nodeValue.trim()) && n.parentElement && n.parentElement.getClientRects().length) return n.parentElement;
+        }
+      }
+      return null;
+    }
+    function chainOf(e, max) {
+      var out = [];
+      var k = 0;
+      while (e && e !== document.body && k < max) {
+        var cs = getComputedStyle(e);
+        var slot = e.getAttribute && e.getAttribute('slot');
+        out.push(nm(e) + (slot ? '[slot=' + slot + ']' : '') + ' (' + cs.position + ' ' + box(e) + (e.getRootNode && e.getRootNode() !== document ? ' shadow' : '') + ')');
+        e = upOne(e); k++;
+      }
+      return out;
+    }
+    function sec(name, fn) {
+      try { fn(); } catch (err) { add(name + ' section failed: ' + (err && err.message)); }
+    }
+
+    add('structure report, script v' + VERSION + ', viewport ' + innerWidth + 'x' + innerHeight + ', page=' + (location.pathname.length < 2 ? '/' : location.pathname.split('/')[1]) + ', theme=' + themeNow());
+    var feed = document.querySelector('shreddit-feed');
+
+    sec('feed', function () {
+      if (!feed) { add('no shreddit-feed on this page'); return; }
+      var runs = [], last = '', n = 0;
+      Array.prototype.forEach.call(feed.children, function (c) {
+        var t = c.tagName.toLowerCase();
+        if (t === last) n++;
+        else { if (last) runs.push(last + 'x' + n); last = t; n = 1; }
+      });
+      if (last) runs.push(last + 'x' + n);
+      add('feed children (' + feed.children.length + '): ' + runs.slice(0, 40).join(' '));
+      var first = {};
+      Array.prototype.forEach.call(feed.children, function (a) {
+        if (a.tagName !== 'ARTICLE') return;
+        var c = a.firstElementChild;
+        var k = c ? c.tagName.toLowerCase() : '(empty)';
+        first[k] = (first[k] || 0) + 1;
+      });
+      add('article first-child tags: ' + JSON.stringify(first));
+      var odd = 0;
+      Array.prototype.forEach.call(feed.children, function (c) {
+        if (odd >= 4) return;
+        if (c.tagName === 'ARTICLE' && c.querySelector('shreddit-post')) return;
+        odd++;
+        var lines = [];
+        sk(c, 0, lines, 14);
+        add('non-post feed child #' + odd + ': ' + nm(c) + ' ' + box(c));
+        lines.forEach(function (l) { add('  ' + l); });
+      });
+    });
+
+    sec('labels', function () {
+      [[/^suggested communities$/i, 'Suggested communities heading'], [/^community highlights$/i, 'Community highlights heading'], [/^suggested for you$/i, 'Suggested-for-you label']].forEach(function (p) {
+        var hit = firstTextHit(p[0]);
+        if (!hit) { add(p[1] + ': not found'); return; }
+        add(p[1] + ' ancestors: ' + chainOf(hit, 10).map(function (s) { return s.replace(/ \(.*\)$/, ''); }).join(' < '));
+      });
+    });
+
+    sec('posts', function () {
+      var posts = Array.prototype.slice.call(document.querySelectorAll('shreddit-post'));
+      var groups = {};
+      posts.forEach(function (p) {
+        var k = (p.getAttribute('view-type') || '?') + '/' + (p.getAttribute('post-type') || '?');
+        (groups[k] = groups[k] || []).push(p);
+      });
+      var keys = Object.keys(groups);
+      add('post groups (view-type/post-type): ' + keys.map(function (k) { return k + 'x' + groups[k].length; }).join(' '));
+      keys.slice(0, 6).forEach(function (k) {
+        var p = groups[k][0], lines = [];
+        add('sample ' + k + ': attrs ' + an(p, true).slice(0, 700));
+        add('  size ' + box(p) + ' shadow=' + !!p.shadowRoot);
+        sk(p, 0, lines, 12);
+        lines.forEach(function (l) { add('  ' + l); });
+      });
+      var nsfw = posts.filter(function (p) {
+        return /nsfw/i.test(p.textContent || '') || Array.prototype.some.call(p.attributes, function (a) { return /nsfw|18/i.test(a.name); });
+      })[0];
+      if (nsfw) {
+        var nl = [];
+        add('nsfw-looking post: attrs ' + an(nsfw, true).slice(0, 700));
+        sk(nsfw, 0, nl, 12);
+        nl.forEach(function (l) { add('  ' + l); });
+      } else add('nsfw-looking post: none on this page');
+    });
+
+    sec('left nav', function () {
+      var pop = firstTextHit(/^popular$/i);
+      if (pop) { add('left nav, ancestors of the Popular link:'); chainOf(pop, 14).forEach(function (l) { add('  ' + l); }); }
+      else add('left nav: Popular link not found');
+      var cand = document.getElementById('left-sidebar-container') || document.querySelector('flex-left-nav-container') || document.querySelector('nav');
+      if (cand) add('nav candidate: ' + nm(cand) + ' ' + box(cand) + ' attrs ' + an(cand, false));
+      var tg = [];
+      allRoots().forEach(function (r) {
+        r.querySelectorAll('button').forEach(function (b) {
+          var rr = b.getBoundingClientRect();
+          var lb = (b.getAttribute('aria-label') || '') + ' ' + (b.id || '');
+          if (rr.left < 320 && rr.top < 140 && rr.width > 0 && /nav|menu|sidebar|collapse|expand/i.test(lb)) tg.push(nm(b) + ' ' + box(b) + ' attrs ' + an(b, false) + ' label=' + String(b.getAttribute('aria-label') || '').slice(0, 30));
+        });
+      });
+      add('nav toggle candidates: ' + (tg.length ? tg.length : 'none'));
+      tg.slice(0, 4).forEach(function (l) { add('  ' + l); });
+    });
+
+    sec('page chrome', function () {
+      var main = document.querySelector('main#main-content') || document.querySelector('main');
+      if (main) {
+        var ct = {};
+        main.querySelectorAll('*').forEach(function (e) {
+          if (e.tagName.indexOf('-') > 0 && !e.closest('shreddit-feed')) { var t = e.tagName.toLowerCase(); ct[t] = (ct[t] || 0) + 1; }
+        });
+        add('custom tags in main outside the feed: ' + Object.keys(ct).sort(function (a, b) { return ct[b] - ct[a]; }).slice(0, 30).map(function (t) { return t + 'x' + ct[t]; }).join(' '));
+      }
+      var rs = document.getElementById('right-sidebar-container');
+      add('#right-sidebar-container: ' + (rs ? box(rs) : 'not found'));
+    });
+
+    return o.join('\n') + '\n' + diag();
+  }
+
   function init() {
     gm.menu('Layout: ' + (cfg.layout ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('layout', !cfg.layout); location.reload(); });
     gm.menu('Lightbox: ' + (cfg.lightbox ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('lightbox', !cfg.lightbox); location.reload(); });
+    gm.menu('Own cards: ' + (cfg.cards ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('cards', !cfg.cards); location.reload(); });
+    gm.menu('Left icon rail: ' + (cfg.rail ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('rail', !cfg.rail); location.reload(); });
     gm.menu('Copy diagnostics', function () {
       var t = diag();
       if (gm.copy(t)) console.log('[lightbox] diagnostics copied to the clipboard');
       else console.log(t);
     });
+    gm.menu('Copy structure report (for designing the next version)', function () {
+      var t = structureReport();
+      if (gm.copy(t)) console.log('[lightbox] structure report copied to the clipboard (' + t.split('\n').length + ' lines)');
+      else console.log(t);
+    });
     if (cfg.layout) gm.style(LAYOUT_CSS);
+    if (cfg.cards && cfg.layout) {
+      docEl().classList.add('lbx-wait');
+      setTimeout(function () { docEl().classList.remove('lbx-wait'); }, 5000);
+    }
+    if (cfg.cards || cfg.rail) {
+      tick();
+      setInterval(tick, 800);
+    }
     if (cfg.lightbox) {
       document.addEventListener('click', onClick, true);
       window.addEventListener('keydown', onKey, true);
@@ -701,7 +1479,10 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox };
+    module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
+      _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
+        own: own, rail: rail, S: S, scanFeed: scanFeed, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
   try { init(); } catch (err) { log('init failed:', err); }
