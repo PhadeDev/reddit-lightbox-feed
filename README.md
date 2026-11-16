@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.3.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.4.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -10,15 +10,18 @@ Status: **v0.3.0, early.** Written against Reddit's page structure as measured o
 - **Clutter removed.** Promoted posts, the "Suggested communities" strip, community highlights, the right-hand sidebar and the card/compact view switch are hidden on feed pages.
 - **Icon rail.** The left menu becomes a 64px rail of icons (Home, Popular, News, Explore, then your communities, favourites first). The menu button expands it to show names. The choice is remembered.
 - **Lightbox.** Clicking a card opens the post with its threaded comments. `J` / `K` or the arrow keys move between posts, `Esc` closes, and ctrl-click opens a post in a new tab as usual. Subreddit and user names are normal links.
+- **Opening is quicker.** Hovering a card briefly pre-loads its comments.
 - **Voting.** The vote buttons press Reddit's own hidden buttons for that post. If they cannot be found the script says so instead of pretending.
 - **NSFW.** Posts marked 18+ get no thumbnail or text preview on the card, and their media is hidden behind a click in the lightbox. Communities marked 18+ get a plain letter in the rail instead of their icon.
 - **Sort bar.** Best, Hot, New, Top and Rising tabs at the top centre of the feed (no Best inside communities). They are plain links to Reddit's own sort pages.
 - **Image zoom.** Clicking an image in the lightbox opens it full screen; click again for full size with scrolling. Esc closes the image first, then the post.
 - **User hover card.** Hover (or tab to) a username on a card or in the lightbox for account age and karma, a **Start chat** link to Reddit's chat, and a link to their profile where Reddit's own Follow button is. Chat opens in a new tab.
+- **Save, Hide and the "..." menu on every card.** Hide keeps the card in its place as a greyed placeholder with Undo, so nothing moves. The menu has Save, Hide, Follow post, Copy link, Open on Reddit and Report (opens the post on Reddit). These use Reddit's own `/api/` endpoints with your signed-in session; if Reddit refuses, the change is undone and the reason is shown.
+- **Comments in the lightbox.** Upvote, downvote, save and reply on any comment, plus an Add a comment box for the post. Replies are posted as you through Reddit.
 - **Suggested communities.** Hidden by default; a small "Suggested communities" button above the cards shows or hides the strip.
 - **Safe fallback.** If the cards cannot be drawn, the script goes back to showing Reddit's own cards in a plain grid and says why in the diagnostics.
 
-Not yet: Save and Hide on cards, the "..." menu, voting and replying on comments, the notifications dropdown, and trimming the community banner. Reddit's header, profile menu and chat are left alone.
+Not yet: the notifications dropdown, trimming the community banner, Award, and "Show fewer posts like this". Reddit's header, profile menu and chat are left alone.
 
 ## Install and update (Violentmonkey or Tampermonkey)
 
