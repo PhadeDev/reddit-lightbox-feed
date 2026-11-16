@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.5.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.6.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -19,6 +19,9 @@ Status: **v0.5.0, early.** Written against Reddit's page structure as measured o
 - **Save, Hide and the "..." menu on every card.** Hide keeps the card in its place as a greyed placeholder with Undo, so nothing moves. The menu has Save, Hide, Follow post, Copy link, Open on Reddit and Report (opens the post on Reddit). These use Reddit's own `/api/` endpoints with your signed-in session; if Reddit refuses, the change is undone and the reason is shown.
 - **Comments in the lightbox.** Upvote, downvote, save and reply on any comment, plus an Add a comment box for the post. Replies are posted as you through Reddit.
 - **Community details.** On a community page, **About and rules** opens a side panel with the description, members, created date, community bookmarks, the rules (click to expand) and the full sidebar text. **Flairs** lists the community's flairs, and flair chips on cards are links that filter the feed with Reddit's own `?f=flair_name:"..."` address. An active filter shows as a chip you can click to clear.
+- **Saved posts in gold.** A saved post gets a gold bookmark and a gold outline. Posts you saved earlier are picked up from your saved list (`/user/NAME/saved.json`, up to 300).
+- **Look.** Stronger buttons (purple with a gold Create post link and a gold active sort tab), and on community pages the banner fades into the page.
+- **Create post** is a link to Reddit's submit page for that community, not an inline form.
 - **Suggested communities.** Hidden by default; a small "Suggested communities" button above the cards shows or hides the strip.
 - **Safe fallback.** If the cards cannot be drawn, the script goes back to showing Reddit's own cards in a plain grid and says why in the diagnostics.
 

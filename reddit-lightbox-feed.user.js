@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.5.0
+// @version      0.6.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.5.0';
+  var VERSION = '0.6.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -218,6 +218,8 @@
     'html.lbx-own shreddit-feed { display: block !important; }',
     'html.lbx-own shreddit-feed > *:not(faceplate-partial[slot="load-after"]) { display: none !important; }',
     'html.lbx-own shreddit-feed > faceplate-partial[slot="load-after"] { display: block !important; min-height: 4px; }',
+    'html.lbx-own.lbx-comm #subgrid-container:has(shreddit-feed) > div:first-child { position: relative; }',
+    'html.lbx-own.lbx-comm #subgrid-container:has(shreddit-feed) > div:first-child::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 56%; z-index: 2; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,0) 30%, var(--color-neutral-background, #0e1113) 100%); }',
     'html.lbx-own.lbx-sugg div:has(> shreddit-feed) { display: flex !important; flex-direction: column; }',
     'html.lbx-own.lbx-sugg shreddit-feed { display: contents !important; }',
     'html.lbx-own.lbx-sugg #lbx-feed-host { order: 1; }',
@@ -974,7 +976,7 @@
   /* ------------------------------------------------------------------ */
 
   var TOK = [
-    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#ff7a45;--down:#7aa8ff;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
+    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#ff7a45;--down:#7aa8ff;--gold:#F6A800;--gold-ink:#1f1519;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
     ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#c8431a;--down:#2f5fc4}',
     '*{box-sizing:border-box}',
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}',
@@ -1018,8 +1020,9 @@
     '.sp2{flex:1}',
     '.ib2{width:28px;height:28px;border-radius:99px;display:grid;place-items:center;color:var(--muted)}',
     '.ib2:hover{background:var(--surface2);color:var(--fg)}',
-    '.ib2.sv.on{color:var(--accent)}',
+    '.ib2.sv.on{color:var(--gold)}',
     '.ib2.sv.on .ic{fill:currentColor}',
+    '.card.saved,.card.saved:hover{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 16px rgba(246,168,0,.22)}',
     '.hov{display:none;position:absolute;inset:0;background:var(--surface);flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);z-index:2}',
     '.card.hid > :not(.hov){visibility:hidden}',
     '.card.hid .hov{display:flex}',
@@ -1030,7 +1033,7 @@
     '.mi{display:block;width:100%;text-align:left;padding:8px 12px;border-radius:6px;color:var(--fg);text-decoration:none;font-size:13px;cursor:pointer;background:none;border:0;font:inherit}',
     '.mi:hover{background:var(--surface2)}',
     '.bl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-self:start}',
-    '.fchip{display:inline-flex;align-items:center;text-decoration:none;color:var(--fg);border-color:var(--accent);background:var(--accent-bg)}',
+    '.fchip{border-color:var(--gold)}',
     '.about{position:fixed;top:56px;right:0;bottom:0;z-index:35;width:min(420px,100vw);background:var(--surface);color:var(--fg);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(0,0,0,.4);overflow:auto;outline:none}',
     '.ab-head{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line);z-index:1}',
     '.ab-body{padding:14px 16px 28px;display:flex;flex-direction:column;gap:10px}',
@@ -1053,12 +1056,14 @@
     '.skel{height:14px;border-radius:6px;background:var(--surface2)}',
     '.bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:0 0 10px}',
     '.bar .sg{justify-self:end}',
-    '.sorts{display:inline-flex;gap:2px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:99px}',
+    '.sorts{display:inline-flex;gap:2px;padding:3px;background:var(--surface);border:1px solid var(--accent);border-radius:99px}',
     '.so{padding:4px 16px;border-radius:99px;color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}',
     '.so:hover{color:var(--fg)}',
-    '.so.on{background:var(--accent-bg);color:var(--fg)}',
-    '.sg{height:28px;padding:0 12px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-size:12px}',
-    '.sg:hover,.sg[aria-pressed="true"]{color:var(--fg);border-color:var(--accent)}',
+    '.so.on{background:var(--gold);color:var(--gold-ink)}',
+    '.sg{display:inline-flex;align-items:center;height:32px;padding:0 16px;border:1px solid var(--accent);border-radius:99px;background:var(--accent-bg);color:var(--fg);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}',
+    '.sg:hover,.sg[aria-pressed="true"]{background:var(--accent);color:var(--gold-ink)}',
+    '.sg.cta{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}',
+    '.sg.cta:hover{filter:brightness(1.1);background:var(--gold);color:var(--gold-ink)}',
     '.sentinel{height:2px}',
     '.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;background:var(--fg);color:var(--surface);padding:8px 16px;border-radius:99px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:calc(100vw - 32px)}',
     '@media (prefers-reduced-motion:reduce){*{transition:none!important}}'
@@ -1243,7 +1248,7 @@
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -1349,12 +1354,39 @@
     log('vote sent', dir);
   }
 
+  function loadSaved() {
+    if (own.savedP) return own.savedP;
+    own.savedP = fetch('/api/me.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      var name = j && j.data && j.data.name;
+      if (!name) throw new Error('not signed in');
+      var set = {};
+      function page(after, n) {
+        var u = '/user/' + encodeURIComponent(name) + '/saved.json?limit=100&raw_json=1' + (after ? '&after=' + encodeURIComponent(after) : '');
+        return getJson(u).then(function (d) {
+          ((d && d.data && d.data.children) || []).forEach(function (c) { if (c && c.kind === 't3' && c.data && c.data.name) set[c.data.name] = 1; });
+          var nx = d && d.data && d.data.after;
+          return nx && n < 3 ? page(nx, n + 1) : set;
+        });
+      }
+      return page('', 0);
+    }).then(function (set) { own.savedSet = set; markSaved(); }, function (e) { own.savedSet = {}; log('saved list unavailable:', (e && e.message) || e); });
+    return own.savedP;
+  }
+
+  function markSaved() {
+    if (!own.savedSet) return;
+    own.shown.forEach(function (id) {
+      if (own.savedSet[id] && !own.saved[id] && !own.touched[id]) { own.saved[id] = true; paintCard(id); }
+    });
+  }
+
   function cardOf(id) { return own.cards[id] || null; }
 
   function paintCard(id) {
     var c = cardOf(id);
     if (!c) return;
     c.classList.toggle('hid', !!own.hid[id]);
+    c.classList.toggle('saved', !!own.saved[id]);
     var sv = c.querySelector('[data-act="save"]');
     if (sv) {
       sv.className = 'ib2 sv' + (own.saved[id] ? ' on' : '');
@@ -1366,6 +1398,7 @@
 
   function doSave(id) {
     var prev = !!own.saved[id];
+    own.touched[id] = true;
     own.saved[id] = !prev;
     paintCard(id);
     postApi(prev ? '/api/unsave' : '/api/save', { id: id }).then(function () { toast(prev ? 'Removed from saved' : 'Saved'); }, function (e) {
@@ -1565,7 +1598,11 @@
     own.sortKey = key;
     own.sub = info ? info.sub : '';
     var showLeft = !!own.sub && !/^(popular|all|home)$/i.test(own.sub);
-    if (own.left) own.left.style.display = showLeft ? '' : 'none';
+    if (own.left) own.left.style.display = info ? '' : 'none';
+    if (own.aboutB) own.aboutB.style.display = showLeft ? '' : 'none';
+    if (own.flairB) own.flairB.style.display = showLeft ? '' : 'none';
+    if (own.createB) own.createB.setAttribute('href', showLeft ? '/r/' + encodeURIComponent(own.sub) + '/submit/' : '/submit/');
+    docEl().classList.toggle('lbx-comm', showLeft);
     var fl = showLeft ? currentFlair() : '';
     if (own.fchip) {
       own.fchip.style.display = fl ? '' : 'none';
@@ -1777,7 +1814,8 @@
       own.fchip.style.display = 'none';
       own.aboutB.addEventListener('click', function () { if (own.sub) openAbout(own.sub); });
       own.flairB.addEventListener('click', function () { if (own.sub) openFlairs(own.sub, own.flairB); });
-      own.left = el('div', { class: 'bl' }, own.aboutB, own.flairB, own.fchip);
+      own.createB = el('a', { class: 'sg cta', href: '/submit/', text: 'Create post' });
+      own.left = el('div', { class: 'bl' }, own.createB, own.aboutB, own.flairB, own.fchip);
       own.bar = el('div', { class: 'bar' }, own.left, own.sorts, own.sg);
       own.sg.addEventListener('click', toggleSugg);
       own.root.appendChild(own.bar);
@@ -1866,11 +1904,14 @@
         own.plToId[p.permalink] = id;
         var c = cardEl(p);
         own.cards[id] = c;
+        if (own.savedSet && own.savedSet[id] && !own.touched[id]) own.saved[id] = true;
         own.grid.appendChild(c);
         own.shown.push(id);
       });
       own.busy = false;
       if (own.shown.length) {
+        own.shown.forEach(function (i) { if (own.saved[i]) paintCard(i); });
+        loadSaved();
         docEl().classList.add('lbx-own');
         docEl().classList.remove('lbx-wait');
         watchSentinel();
@@ -2140,6 +2181,11 @@
     }
     var fp = document.querySelector('shreddit-feed shreddit-post');
     o.push(T + 'first post attributes: ' + (fp && fp.getAttributeNames ? fp.getAttributeNames().join(' ') : 'none') + ' | nsfwFlagged=' + own.shown.filter(function (i) { return own.posts.get(i) && own.posts.get(i).over_18; }).length + ' withImage=' + own.shown.filter(function (i) { return own.posts.get(i) && !!thumbFor(own.posts.get(i)); }).length);
+    if (docEl().classList.contains('lbx-comm')) {
+      var hd = document.querySelector('#subgrid-container > div');
+      o.push(T + 'community header (first div in #subgrid-container):');
+      (function walkH(n, dp) { if (!n || dp > 3 || o.length > 400) return; Array.prototype.slice.call(n.children, 0, 6).forEach(function (k) { o.push(T + '  ' + new Array(dp + 1).join(' ') + box(k)); walkH(k, dp + 1); }); })(hd, 0);
+    }
     o.push(T + 'own cards shown=' + own.shown.length + ' failed=' + (own.failed || 'no') + ' lastAction=' + ACT.last + ' extraData=' + (own.apiOk >= 0 ? 'ok(' + own.apiOk + ')' : (own.apiDead || 'untried')) + ' html.lbx-own=' + docEl().classList.contains('lbx-own') +
       ' rail=' + (rail.host ? 'built' : 'no') + ' communities=' + (rail.subs ? rail.subs.length : 'n/a') + (rail.err ? ' railError=' + rail.err : '') +
       ' cfg=' + JSON.stringify(cfg));
@@ -2363,7 +2409,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, loadSaved: loadSaved, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
