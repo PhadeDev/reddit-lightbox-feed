@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.6.0
+// @version      0.6.1
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.6.0';
+  var VERSION = '0.6.1';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -253,8 +253,8 @@
   ].join('\n');
 
   var LB_CSS = [
-    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#ff7a45;--scrim:rgba(8,5,8,.72);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
-    ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#c8431a;--scrim:rgba(30,15,25,.55)}',
+    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--scrim:rgba(8,5,8,.72);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
+    ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#1a8f3c;--down:#c62828;--scrim:rgba(30,15,25,.55)}',
     '*{box-sizing:border-box}',
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}',
     ':focus-visible{outline:2px solid var(--accent);outline-offset:2px}',
@@ -976,8 +976,8 @@
   /* ------------------------------------------------------------------ */
 
   var TOK = [
-    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#ff7a45;--down:#7aa8ff;--gold:#F6A800;--gold-ink:#1f1519;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
-    ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#c8431a;--down:#2f5fc4}',
+    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--gold:#F6A800;--gold-ink:#1f1519;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
+    ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#1a8f3c;--down:#c62828}',
     '*{box-sizing:border-box}',
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}',
     ':focus-visible{outline:2px solid var(--accent);outline-offset:2px}',
@@ -1023,6 +1023,10 @@
     '.ib2.sv.on{color:var(--gold)}',
     '.ib2.sv.on .ic{fill:currentColor}',
     '.card.saved,.card.saved:hover{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 16px rgba(246,168,0,.22)}',
+    '.card.vup,.card.vup:hover{border-color:var(--up);box-shadow:0 0 0 1px var(--up),0 0 16px rgba(63,185,80,.25)}',
+    '.card.vdn,.card.vdn:hover{border-color:var(--down);box-shadow:0 0 0 1px var(--down),0 0 16px rgba(248,81,73,.25)}',
+    '.card.saved.vup,.card.saved.vup:hover{box-shadow:0 0 0 1px var(--up),0 0 0 3px var(--gold),0 0 16px rgba(246,168,0,.22)}',
+    '.card.saved.vdn,.card.saved.vdn:hover{box-shadow:0 0 0 1px var(--down),0 0 0 3px var(--gold),0 0 16px rgba(246,168,0,.22)}',
     '.hov{display:none;position:absolute;inset:0;background:var(--surface);flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);z-index:2}',
     '.card.hid > :not(.hov){visibility:hidden}',
     '.card.hid .hov{display:flex}',
@@ -1248,7 +1252,7 @@
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, vtouched: {}, voteMap: null, votesP: null, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -1349,8 +1353,10 @@
     if (!btn) { toast('Voting from here is not available yet. Open the post to vote on Reddit.'); log('vote button not found', dir); return; }
     try { btn.click(); } catch (e) { log('vote click failed:', e); return; }
     own.votes[id] = cur === want ? 0 : want;
+    own.vtouched[id] = true;
     var old = card.querySelector('.vote');
     if (old) old.replaceWith(voteBox(p));
+    paintCard(id);
     log('vote sent', dir);
   }
 
@@ -1373,6 +1379,44 @@
     return own.savedP;
   }
 
+  function loadVotes() {
+    if (own.votesP) return own.votesP;
+    own.votesP = fetch('/api/me.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      var name = j && j.data && j.data.name;
+      if (!name) throw new Error('not signed in');
+      var map = {};
+      function walk(kind, val) {
+        function page(after, n) {
+          var u = '/user/' + encodeURIComponent(name) + '/' + kind + '.json?limit=100&raw_json=1' + (after ? '&after=' + encodeURIComponent(after) : '');
+          return getJson(u).then(function (d) {
+            ((d && d.data && d.data.children) || []).forEach(function (c) { if (c && c.kind === 't3' && c.data && c.data.name) map[c.data.name] = val; });
+            var nx = d && d.data && d.data.after;
+            return nx && n < 2 ? page(nx, n + 1) : null;
+          });
+        }
+        return page('', 0).catch(function (e) { log(kind + ' list unavailable:', (e && e.message) || e); });
+      }
+      return walk('upvoted', 1).then(function () { return walk('downvoted', -1); }).then(function () { return map; });
+    }).then(function (map) { own.voteMap = map; markVotes(); }, function (e) { own.voteMap = {}; log('vote lists unavailable:', (e && e.message) || e); });
+    return own.votesP;
+  }
+
+  function markVotes() {
+    if (!own.voteMap) return;
+    own.shown.forEach(function (id) {
+      var v = own.voteMap[id];
+      if (!v || own.vtouched[id]) return;
+      if (own.votes[id] !== v) {
+        own.v0[id] = v;
+        own.votes[id] = v;
+        var c = cardOf(id), p = own.posts.get(id);
+        var old = c && c.querySelector('.vote');
+        if (old && p) old.replaceWith(voteBox(p));
+      }
+      paintCard(id);
+    });
+  }
+
   function markSaved() {
     if (!own.savedSet) return;
     own.shown.forEach(function (id) {
@@ -1387,6 +1431,8 @@
     if (!c) return;
     c.classList.toggle('hid', !!own.hid[id]);
     c.classList.toggle('saved', !!own.saved[id]);
+    c.classList.toggle('vup', (own.votes[id] || 0) > 0);
+    c.classList.toggle('vdn', (own.votes[id] || 0) < 0);
     var sv = c.querySelector('[data-act="save"]');
     if (sv) {
       sv.className = 'ib2 sv' + (own.saved[id] ? ' on' : '');
@@ -1902,6 +1948,7 @@
         if (!p || !p.permalink || !p.title) return;
         own.posts.set(id, p);
         own.plToId[p.permalink] = id;
+        if (own.voteMap && own.voteMap[id]) p.likes = own.voteMap[id] > 0;
         var c = cardEl(p);
         own.cards[id] = c;
         if (own.savedSet && own.savedSet[id] && !own.touched[id]) own.saved[id] = true;
@@ -1910,8 +1957,9 @@
       });
       own.busy = false;
       if (own.shown.length) {
-        own.shown.forEach(function (i) { if (own.saved[i]) paintCard(i); });
+        own.shown.forEach(function (i) { paintCard(i); });
         loadSaved();
+        loadVotes();
         docEl().classList.add('lbx-own');
         docEl().classList.remove('lbx-wait');
         watchSentinel();
@@ -2409,7 +2457,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, loadSaved: loadSaved, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, scanFeed: scanFeed, domPost: domPost, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
