@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.11.1
+// @version      0.11.2
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.11.1';
+  var VERSION = '0.11.2';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -545,59 +545,6 @@
 
   var HC = { data: {}, fol: {}, showT: 0, hideT: 0, cur: '', chat: 'not used yet' };
 
-  function fireOn(node, types) {
-    types.forEach(function (t) {
-      try { node.dispatchEvent(new MouseEvent(t, { bubbles: true, composed: true, cancelable: true, view: window })); } catch (e) { /* ignore */ }
-    });
-  }
-
-  /* Reddit's own Start chat button opens the chat panel with that person.
-     Its hover card is only built when you hover a name, so wake it up on the
-     person's (hidden) post and wait for the button to appear. */
-  function nativeChat(name) {
-    return new Promise(function (resolve) {
-      if (!/^[\w-]{1,32}$/.test(String(name))) { resolve(null); return; }
-      var lower = String(name).toLowerCase();
-      var want = '/user/' + lower;
-      var ends = function (n) { return String(n.getAttribute('href') || '').toLowerCase().replace(/\/+$/, '').slice(-want.length) === want; };
-      var posts = Array.prototype.filter.call(document.querySelectorAll('shreddit-post'), function (p) { return String(p.getAttribute('author') || '').toLowerCase() === lower; });
-      if (!posts.length) { resolve(null); return; }
-      var post = posts[0];
-      function find() {
-        var all = document.querySelectorAll('a[data-testid="private-chat-button"]');
-        for (var i = 0; i < all.length; i++) if (ends(all[i])) return all[i];
-        return deepFind(post, function (n) { return n.tagName === 'A' && n.getAttribute('data-testid') === 'private-chat-button' && ends(n); });
-      }
-      var b = find();
-      if (b) { resolve(b); return; }
-      var trig = deepFind(post, function (n) { return n.tagName === 'A' && n.getAttribute('data-testid') !== 'private-chat-button' && String(n.getAttribute('href') || '').toLowerCase().indexOf(want) >= 0; });
-      if (!trig) { resolve(null); return; }
-      fireOn(trig, ['pointerover', 'mouseover', 'pointerenter', 'mouseenter']);
-      var tries = 0;
-      var iv = setInterval(function () {
-        var f2 = find();
-        if (f2 || ++tries > 16) {
-          clearInterval(iv);
-          resolve(f2 || null);
-        }
-      }, 150);
-    });
-  }
-
-  function startChat(name, url) {
-    HC.chat = 'looking for Reddit\'s own Start chat button';
-    nativeChat(name).then(function (b) {
-      if (b) {
-        HC.chat = 'pressed Reddit\'s own Start chat button';
-        log('chat: pressing Reddit\'s own Start chat button');
-        try { b.click(); return; } catch (e) { log('chat: that button would not press:', e); }
-      }
-      HC.chat = 'no native button found, opened the chat page in a new tab';
-      log('chat: no Reddit Start chat button found for this person, opening the chat page');
-      window.open(url, '_blank', 'noopener');
-    });
-  }
-
   function userAbout(name) {
     var k = String(name).toLowerCase();
     if (!HC.data[k]) {
@@ -622,6 +569,25 @@
     var pop = el('div', { class: 'hcard', role: 'dialog', 'aria-label': 'User details' });
     pop.style.display = 'none';
     rootNode.appendChild(pop);
+    pop.addEventListener('click', function (e) {
+      var t = e.target;
+      var a = t && t.closest ? t.closest('a[data-testid="private-chat-button"]') : null;
+      if (!a || e.defaultPrevented || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      var url = a.getAttribute('href');
+      if (e.preventDefault) e.preventDefault();
+      var host = document.querySelector('reddit-chat-host');
+      try {
+        if (host && typeof host.openChatUrl === 'function') {
+          host.openChatUrl(url);
+          HC.chat = 'Reddit\'s component did not take the click, asked the chat panel directly';
+          log('chat: asked the chat panel to open');
+          return;
+        }
+      } catch (er) { log('chat: the chat panel refused:', er); }
+      HC.chat = 'opened the chat page in a new tab';
+      log('chat: opening the chat page in a new tab');
+      window.open(url, '_blank', 'noopener');
+    });
 
     function hideNow() { clearTimeout(HC.showT); pop.style.display = 'none'; HC.cur = ''; }
     function hide() { clearTimeout(HC.showT); clearTimeout(HC.hideT); HC.hideT = setTimeout(hideNow, 220); }
@@ -691,13 +657,16 @@
           });
           actions.push(fb);
         }
-        var chatA = el('a', { class: 'hb pri', href: 'https://chat.reddit.com/user/' + enc, target: '_blank', rel: 'noopener noreferrer', text: 'Start chat' });
-        chatA.addEventListener('click', function (e) {
-          if (e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-          if (e.preventDefault) e.preventDefault();
-          startChat(name, 'https://chat.reddit.com/user/' + enc);
-        });
-        actions.push(chatA);
+        var chatA = el('a', { class: 'hb pri', href: 'https://chat.reddit.com/user/' + enc, target: '_blank', rel: 'noopener noreferrer', 'data-testid': 'private-chat-button', text: 'Start chat' });
+        var chatNode = chatA;
+        try {
+          if (typeof customElements !== 'undefined' && customElements.get('reddit-chat-anchor')) {
+            chatNode = el('reddit-chat-anchor', {}, chatA);
+            chatNode.style.display = 'contents';
+          }
+        } catch (er) { /* plain link */ }
+        HC.chat = chatNode === chatA ? 'Reddit chat component not found, plain link' : 'wrapped in Reddit\'s own chat link component';
+        actions.push(chatNode);
         actions.push(el('a', { class: 'hb', href: '/user/' + enc + '/', text: 'View profile' }));
       }
       kids.push(el('div', { class: 'ha' }, actions));
@@ -3086,7 +3055,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, startChat: startChat, nativeChat: nativeChat, railWanted: railWanted, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, railWanted: railWanted, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
