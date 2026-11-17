@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.10.1
+// @version      0.10.2
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.10.1';
+  var VERSION = '0.10.2';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -347,6 +347,11 @@
     '.cmp{margin:8px 0;display:flex;flex-direction:column;gap:6px}',
     '.cmp textarea{width:100%;min-height:84px;resize:vertical;background:var(--surface2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}',
     '.cmp .row{display:flex;gap:8px;align-items:center}',
+    '.cnote{margin:6px 0;padding:6px 12px;border-radius:8px;font-size:13px}',
+    '.cnote.ok{background:rgba(63,185,80,.16);color:var(--up)}',
+    '.cnote.bad{background:rgba(248,81,73,.16);color:var(--down)}',
+    '@keyframes lbxfresh{from{background:rgba(246,168,0,.28)}to{background:rgba(246,168,0,0)}}',
+    '.fresh{animation:lbxfresh 2.6s ease-out;border-radius:8px}',
     '.hint2{margin-left:auto;font-size:11px;color:var(--muted)}',
     '.go{padding:5px 14px;border-radius:99px;background:var(--accent-bg);color:var(--fg);font-weight:600;font-size:13px}',
     '.go:disabled{opacity:.5;cursor:default}',
@@ -852,15 +857,21 @@
     if (addB.tagName === 'BUTTON') addB.addEventListener('click', function () {
       if (topC && topC.box.parentNode) { topC.ta.focus(); return; }
       topC = composer(p.name, pl, function (nd) {
-        var n = commentNode({ kind: 't1', data: newComment(nd) }, pl);
+        var n = commentNode({ kind: 't1', data: nd }, pl);
         if (noneNote && noneNote.parentNode) noneNote.parentNode.removeChild(noneNote);
         if (n) prepend(thread, n);
+        return n;
       }, 'Add a comment');
       topSlot.appendChild(topC.box);
       topC.ta.focus();
     });
+    ui.curPost = p;
+    ui.chead = el('h3', { text: fmt(p.num_comments) + ' comments' });
+    ui.notice = el('div', { class: 'cnote', role: 'status' });
+    ui.notice.style.display = 'none';
     setKids(ui.cmPane,
-      el('div', { class: 'ch' }, el('h3', { text: fmt(p.num_comments) + ' comments' }), el('span', { text: 'Sorted by best.' })),
+      el('div', { class: 'ch' }, ui.chead, el('span', { text: 'Sorted by best.' })),
+      ui.notice,
       addB,
       topSlot,
       thread
@@ -962,6 +973,55 @@
     else parent.appendChild(node);
   }
 
+  /* A line of status at the top of the comments column (posted, or why not) */
+  function lbNotice(msg, bad) {
+    if (!ui.notice) return;
+    ui.notice.textContent = msg;
+    ui.notice.className = 'cnote ' + (bad ? 'bad' : 'ok');
+    ui.notice.style.display = '';
+    clearTimeout(ui.noticeT);
+    ui.noticeT = setTimeout(function () { if (ui.notice) ui.notice.style.display = 'none'; }, 7000);
+  }
+
+  function bumpCount() {
+    var p = ui.curPost;
+    if (!p) return;
+    p.num_comments = (p.num_comments || 0) + 1;
+    if (ui.chead) ui.chead.textContent = fmt(p.num_comments) + ' comments';
+    var op = own.posts.get(p.name);
+    if (op && op !== p) op.num_comments = (op.num_comments || 0) + 1;
+    var c = op && cardOf(p.name);
+    var lab = c && c.querySelector('[data-act="open"] span');
+    if (lab && op) lab.textContent = fmt(op.num_comments);
+  }
+
+  function htmlEscape(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function htmlDecode(h) {
+    return String(h).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;|&#x27;/g, "'").replace(/&amp;/g, '&');
+  }
+
+  /* Whatever Reddit sent back, make something we can show: your own words
+     when its copy is missing, decoded HTML when it was escaped. */
+  function newComment(nd, text) {
+    var d = nd ? Object.assign({}, nd) : {};
+    var html = String(d.body_html || '');
+    if (html && /&lt;/.test(html) && !/</.test(html)) html = htmlDecode(html);
+    if (!html) {
+      html = '<div class="md"><p>' + htmlEscape(text || d.body || '').replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>') + '</p></div>';
+    }
+    d.body_html = html;
+    d.author = d.author || own.me || 'you';
+    d.created_utc = d.created_utc || Date.now() / 1000;
+    d.score = d.score != null ? d.score : 1;
+    d.likes = d.likes != null ? d.likes : true;
+    d.replies = '';
+    if (!d.name && d.id) d.name = /^t1_/.test(d.id) ? d.id : 't1_' + d.id;
+    return d;
+  }
+
   function composer(thingId, pl, onDone, placeholder) {
     var ta = el('textarea', { rows: '4', placeholder: placeholder || 'Write a reply...', 'aria-label': 'Write a reply', maxlength: '10000' });
     var er = el('div', { class: 'er', role: 'alert' });
@@ -974,30 +1034,37 @@
       if (!t) { er.textContent = 'Write something first.'; er.style.display = 'block'; return; }
       if (go.disabled) return;
       go.disabled = true;
+      go.textContent = 'Posting...';
       er.style.display = 'none';
       postApi('/api/comment', { thing_id: thingId, text: t, raw_json: '1' }).then(function (j) {
         var th = j && j.json && j.json.data && j.json.data.things && j.json.data.things[0];
-        if (!th || !th.data) throw new Error('Reddit did not return the new comment');
+        var nd = th && th.data ? th.data : null;
         cache.delete(pl);
         if (box.parentNode) box.parentNode.removeChild(box);
-        onDone(th.data);
-      }).catch(function (e) {
+        var node = null;
+        try {
+          node = onDone(newComment(nd, t));
+        } catch (e) {
+          log('showing the new comment failed:', e);
+        }
+        bumpCount();
+        if (node) {
+          lbNotice(nd ? 'Comment posted.' : 'Comment sent. Reddit did not send a copy back, so refresh to check it is there.', false);
+          if (node.classList) node.classList.add('fresh');
+          if (node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
+        } else lbNotice('Your comment was posted, but could not be shown here. Reload the page to see it.', true);
+      }, function (e) {
         go.disabled = false;
+        go.textContent = 'Post reply';
         er.textContent = 'Could not post: ' + String((e && e.message) || e);
         er.style.display = 'block';
+        lbNotice('Your comment was not posted: ' + String((e && e.message) || e), true);
       });
     }
     go.addEventListener('click', send);
     cancel.addEventListener('click', function () { if (box.parentNode) box.parentNode.removeChild(box); });
     ta.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); send(); } });
     return { box: box, ta: ta };
-  }
-
-  function newComment(nd) {
-    nd.created_utc = nd.created_utc || Date.now() / 1000;
-    nd.score = nd.score != null ? nd.score : 1;
-    if (!nd.body_html && nd.body) nd.body_html = '<div class="md"><p></p></div>';
-    return nd;
   }
 
   function commentActions(d, pl, slot) {
@@ -1045,8 +1112,9 @@
     rpB.addEventListener('click', function () {
       if (openC && openC.box.parentNode) { openC.ta.focus(); return; }
       openC = composer(d.name, pl, function (nd) {
-        var n = commentNode({ kind: 't1', data: newComment(nd) }, pl, (slot.depth || 0) + 1);
+        var n = commentNode({ kind: 't1', data: nd }, pl, (slot.depth || 0) + 1);
         if (n) prepend(slot.kids, n);
+        return n;
       }, 'Reply to u/' + (d.author || 'this comment'));
       slot.cslot.appendChild(openC.box);
       openC.ta.focus();
@@ -2907,7 +2975,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, postActions: postActions, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }

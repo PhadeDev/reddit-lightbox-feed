@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.10.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.10.2, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -27,6 +27,7 @@ Status: **v0.10.1, early.** Written against Reddit's page structure as measured 
 - **Reading-order guide.** A faint line with a few arrows at its left sits between rows of cards, so it is clear where each new row starts.
 - **Home button opens Hot.** The Home icon in the left rail goes to /hot/ (your subscribed communities, sorted Hot). Switch it back to Reddit's own home from the Violentmonkey menu ("Home button opens").
 - **One sort control.** Reddit's own sort dropdowns are hidden on feed pages. The sort bar highlights your current sort even when the address has none, and choosing Top shows a second bar: Now, Today, This Week, This Month, This Year, All Time.
+- **Posting a comment.** After you post, a green line says "Comment posted", the new comment appears at once (highlighted for a moment) and the comment count goes up. If Reddit refuses, the reason shows both under the box and in the status line, and your text stays. If Reddit does not send a copy back, your own words are shown with a note to refresh.
 - **Quick start.** Which posts you saved or voted on is remembered between visits, so cards show their gold or green/red state on the first paint, then it is refreshed from Reddit in the background. Reddit's own post-detail requests (which it refuses) are no longer tried.
 - **Look.** Stronger buttons (purple with a gold Create post link and a gold active sort tab), and on community pages the banner fades into the page (a mask on Reddit's own banner image).
 - **Create post** is a link to Reddit's submit page for that community, not an inline form.
