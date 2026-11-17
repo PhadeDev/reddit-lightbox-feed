@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.10.2
+// @version      0.11.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.10.2';
+  var VERSION = '0.11.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -251,7 +251,15 @@
     '.hcard .hb{flex:1 1 auto;text-align:center;padding:7px 12px;border-radius:99px;border:1px solid var(--line);color:var(--fg);text-decoration:none;font-weight:600;font-size:13px}',
     '.hcard .hb:hover{border-color:var(--accent)}',
     '.hcard .hb.pri{background:var(--accent-bg)}',
-    '.hcard .hm{margin-top:10px;color:var(--muted);font-size:12px}'
+    '.hcard .hm{margin-top:10px;color:var(--muted);font-size:12px}',
+    '.hcard .er2{color:#ff9a9a}',
+    '.hcard .hbio{margin:10px 0 0;font-size:13px;overflow-wrap:anywhere}',
+    '.hcard .hstats{display:flex;gap:22px;margin-top:10px}',
+    '.hcard .hst{display:flex;flex-direction:column}',
+    '.hcard .hst b{font-size:15px}',
+    '.hcard .hst span{color:var(--muted);font-size:12px}',
+    '.hcard .hb.fol{background:var(--accent-bg);cursor:pointer}',
+    '.hcard .hb.fol.on{background:transparent}'
   ].join('\n');
 
   var LB_CSS = [
@@ -535,7 +543,7 @@
   /* a plain link to Reddit's chat, Follow stays on Reddit's own page.   */
   /* ------------------------------------------------------------------ */
 
-  var HC = { data: {}, showT: 0, hideT: 0, cur: '' };
+  var HC = { data: {}, fol: {}, showT: 0, hideT: 0, cur: '' };
 
   function userAbout(name) {
     var k = String(name).toLowerCase();
@@ -580,11 +588,17 @@
       pop.style.top = Math.round(top) + 'px';
     }
 
+    function stat(n, label) {
+      return el('div', { class: 'hst' }, el('b', { text: Number(n || 0).toLocaleString('en-GB') }), el('span', { text: label }));
+    }
+
     function render(a, name, d, note) {
       var enc = encodeURIComponent(name);
+      var sr = d && d.subreddit ? d.subreddit : null;
+      var adult = !!(sr && sr.over_18);
       var av = el('span', { class: 'hav', text: name.charAt(0).toUpperCase() });
       av.style.background = 'hsl(' + (hashStr(name) % 360) + ' 45% 34%)';
-      var img = d && !(d.subreddit && d.subreddit.over_18) ? (d.snoovatar_img || d.icon_img || '') : '';
+      var img = d && !adult ? (d.snoovatar_img || d.icon_img || '') : '';
       if (/^https:\/\//i.test(img)) {
         var im = el('img', { src: img, alt: '', referrerpolicy: 'no-referrer' });
         im.addEventListener('error', function () { if (im.remove) im.remove(); });
@@ -592,19 +606,44 @@
       }
       var sub = note || '';
       if (d && !note) {
-        var karma = d.total_karma != null ? d.total_karma : (d.link_karma || 0) + (d.comment_karma || 0);
-        sub = (d.created_utc ? 'Redditor for ' + redditorFor(d.created_utc) + ' · ' : '') + fmt(karma) + ' karma';
         if (d.is_suspended) sub = 'This account is suspended.';
+        else if (d.created_utc) sub = 'Joined ' + new Date(d.created_utc * 1000).toLocaleDateString('en-GB') + ' · Redditor for ' + redditorFor(d.created_utc);
+      }
+      var kids = [el('div', { class: 'hh' }, av, el('div', {}, el('div', { class: 'hn', text: 'u/' + name }), el('div', { class: 'hs', text: sub })))];
+      if (d && !note && !d.is_suspended) {
+        if (adult) kids.push(el('div', { class: 'hm', text: '18+ profile: the picture and bio are hidden here.' }));
+        else if (sr && sr.public_description) kids.push(el('p', { class: 'hbio', text: String(sr.public_description).slice(0, 300) }));
+        kids.push(el('div', { class: 'hstats' }, stat(d.link_karma, 'Post karma'), stat(d.comment_karma, 'Comment karma')));
       }
       var actions = [];
+      var msg = el('div', { class: 'hm er2' });
+      msg.style.display = 'none';
       if (!d || !d.is_suspended) {
-        if (d && d.accept_chats === false) actions.push(el('span', { class: 'hm', text: 'Not accepting chat requests.' }));
-        else actions.push(el('a', { class: 'hb pri', href: 'https://chat.reddit.com/user/' + enc, target: '_blank', rel: 'noopener noreferrer', text: 'Start chat' }));
-        actions.push(el('a', { class: 'hb', href: '/user/' + enc + '/', title: 'Opens their profile, where Reddit\'s Follow button is', text: 'Profile and follow' }));
+        if (d && sr && sr.display_name && d.accept_followers !== false) {
+          var isF = function () { return HC.fol[name] !== undefined ? HC.fol[name] : !!sr.user_is_subscriber; };
+          var fb = el('button', { class: 'hb fol', type: 'button' });
+          var paintF = function () { var on = isF(); fb.textContent = on ? 'Following' : 'Follow'; fb.className = 'hb fol' + (on ? ' on' : ''); fb.setAttribute('aria-pressed', String(on)); };
+          paintF();
+          fb.addEventListener('click', function () {
+            var prev = isF();
+            HC.fol[name] = !prev;
+            paintF();
+            msg.style.display = 'none';
+            postApi('/api/subscribe', { action: prev ? 'unsub' : 'sub', sr_name: sr.display_name, skip_initial_defaults: 'true' }).catch(function (e) {
+              HC.fol[name] = prev;
+              paintF();
+              msg.textContent = (prev ? 'Unfollowing' : 'Following') + ' did not work: ' + String((e && e.message) || e);
+              msg.style.display = '';
+            });
+          });
+          actions.push(fb);
+        }
+        actions.push(el('a', { class: 'hb pri', href: 'https://chat.reddit.com/user/' + enc, target: '_blank', rel: 'noopener noreferrer', text: 'Start chat' }));
+        actions.push(el('a', { class: 'hb', href: '/user/' + enc + '/', text: 'View profile' }));
       }
-      setKids(pop,
-        el('div', { class: 'hh' }, av, el('div', {}, el('div', { class: 'hn', text: 'u/' + name }), el('div', { class: 'hs', text: sub }))),
-        el('div', { class: 'ha' }, actions));
+      kids.push(el('div', { class: 'ha' }, actions));
+      kids.push(msg);
+      setKids(pop, kids);
       place(a);
     }
 
