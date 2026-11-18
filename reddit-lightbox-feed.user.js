@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.15.0
+// @version      0.15.1
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -24,7 +24,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.15.0';
+  var VERSION = '0.15.1';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -328,6 +328,8 @@
     '.hcard .hav{width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:700;font-size:20px;color:#fff;overflow:hidden;background:var(--accent-bg)}',
     '.hcard .hav img{width:100%;height:100%;object-fit:cover;display:block}',
     '.hcard .hn{font-weight:700;font-size:15px;overflow-wrap:anywhere}',
+    '.hcard a.hn{display:block;color:var(--fg);text-decoration:none}',
+    '.hcard a.hn:hover{color:var(--accent);text-decoration:underline}',
     '.hcard .hs{color:var(--muted);font-size:12px}',
     '.hcard .ha{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}',
     '.hcard .hb{flex:1 1 auto;text-align:center;padding:7px 12px;border-radius:99px;border:1px solid var(--line);color:var(--fg);text-decoration:none;font-weight:600;font-size:13px}',
@@ -626,7 +628,7 @@
   /* a plain link to Reddit's chat, Follow stays on Reddit's own page.   */
   /* ------------------------------------------------------------------ */
 
-  var HC = { data: {}, fol: {}, showT: 0, hideT: 0, cur: '', chat: 'not used yet' };
+  var HC = { data: {}, showT: 0, hideT: 0, cur: '', chat: 'not used yet' };
 
   /* Start chat: the same call Reddit's own chat link component makes (read from
      its code): the chat panel's openChatUrl with a path like /user/NAME. */
@@ -678,6 +680,11 @@
     }
     if (e.preventDefault) e.preventDefault();
     callChat(host, e.detail === 0, path, fullUrl);
+    try {
+      if (ui.hover) ui.hover.hide();
+      if (own.hover) own.hover.hide();
+      if (S.open) close();
+    } catch (x) { log('chat: could not close the lightbox:', x); }
   }
 
   function userAbout(name) {
@@ -744,35 +751,14 @@
         if (d.is_suspended) sub = 'This account is suspended.';
         else if (d.created_utc) sub = 'Joined ' + new Date(d.created_utc * 1000).toLocaleDateString('en-GB') + ' · Redditor for ' + redditorFor(d.created_utc);
       }
-      var kids = [el('div', { class: 'hh' }, av, el('div', {}, el('div', { class: 'hn', text: 'u/' + name }), el('div', { class: 'hs', text: sub })))];
+      var kids = [el('div', { class: 'hh' }, av, el('div', {}, el('a', { class: 'hn', href: '/user/' + enc + '/', target: '_blank', rel: 'noopener noreferrer', title: 'Open their profile in a new tab', text: 'u/' + name }), el('div', { class: 'hs', text: sub })))];
       if (d && !note && !d.is_suspended) {
         if (adult) kids.push(el('div', { class: 'hm', text: '18+ profile: the picture and bio are hidden here.' }));
         else if (sr && sr.public_description) kids.push(el('p', { class: 'hbio', text: String(sr.public_description).slice(0, 300) }));
         kids.push(el('div', { class: 'hstats' }, stat(d.link_karma, 'Post karma'), stat(d.comment_karma, 'Comment karma')));
       }
       var actions = [];
-      var msg = el('div', { class: 'hm er2' });
-      msg.style.display = 'none';
       if (!d || !d.is_suspended) {
-        if (d && sr && sr.display_name && d.accept_followers !== false) {
-          var isF = function () { return HC.fol[name] !== undefined ? HC.fol[name] : !!sr.user_is_subscriber; };
-          var fb = el('button', { class: 'hb fol', type: 'button' });
-          var paintF = function () { var on = isF(); fb.textContent = on ? 'Following' : 'Follow'; fb.className = 'hb fol' + (on ? ' on' : ''); fb.setAttribute('aria-pressed', String(on)); };
-          paintF();
-          fb.addEventListener('click', function () {
-            var prev = isF();
-            HC.fol[name] = !prev;
-            paintF();
-            msg.style.display = 'none';
-            postApi('/api/subscribe', { action: prev ? 'unsub' : 'sub', sr_name: sr.display_name, skip_initial_defaults: 'true' }).catch(function (e) {
-              HC.fol[name] = prev;
-              paintF();
-              msg.textContent = (prev ? 'Unfollowing' : 'Following') + ' did not work: ' + String((e && e.message) || e);
-              msg.style.display = '';
-            });
-          });
-          actions.push(fb);
-        }
         var chatId = d && d.id ? 't2_' + String(d.id).replace(/^t2_/, '') : '';
         var chatPath = '/user/' + (chatId || enc);
         var chatUrl = 'https://chat.reddit.com' + chatPath;
@@ -780,17 +766,8 @@
         chatA.addEventListener('click', function (e) { openChatFor(e, chatPath, chatUrl); });
         var chatNode = chatA;
         actions.push(chatNode);
-        actions.push(el('a', { class: 'hb', href: '/user/' + enc + '/', text: 'View profile' }));
-        var copyB = el('button', { class: 'hb', type: 'button', title: 'Copy the username, to paste into Reddit\'s New chat box', text: 'Copy name' });
-        copyB.addEventListener('click', function () {
-          if (!gm.copy(name) && typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(name).catch(function () { /* ignore */ });
-          copyB.textContent = 'Copied';
-          setTimeout(function () { copyB.textContent = 'Copy name'; }, 1800);
-        });
-        actions.push(copyB);
       }
       kids.push(el('div', { class: 'ha' }, actions));
-      kids.push(msg);
       setKids(pop, kids);
       place(a);
     }
