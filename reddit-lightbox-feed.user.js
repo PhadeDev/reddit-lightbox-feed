@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.12.0
+// @version      0.12.1
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.12.0';
+  var VERSION = '0.12.1';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -279,6 +279,7 @@
     '.sp{flex:1}',
     '.hint{font-size:12px;color:var(--muted);margin-right:6px}',
     '.pane{overflow:auto;padding:20px 22px 28px;min-width:0}',
+    '.acts.stick{position:sticky;top:0;z-index:4;margin:0 -22px;padding:8px 22px;background:var(--surface);border-top:0;border-bottom:1px solid var(--line)}',
     '.post{border-right:1px solid var(--line);display:flex;flex-direction:column;gap:12px}',
     'h2{margin:0;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-.01em;text-wrap:balance;overflow-wrap:anywhere}',
     '.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--muted)}',
@@ -374,7 +375,7 @@
     '.err{border:1px dashed var(--line);border-radius:10px;padding:16px;color:var(--muted)}',
     '.err b{color:var(--fg)}',
     '.skel{height:14px;border-radius:7px;background:var(--surface2);margin:8px 0}',
-    '@media (max-width:859px){.panel{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;overflow:auto;align-content:start;width:100%;height:100%;border-radius:0;border:0}.head{position:sticky;top:0;z-index:2;background:var(--surface)}.pane{overflow:visible;padding:16px}.post{border-right:0;border-bottom:1px solid var(--line)}.hint{display:none}h2{font-size:21px}}',
+    '@media (max-width:859px){.panel{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;overflow:auto;align-content:start;width:100%;height:100%;border-radius:0;border:0}.head{position:sticky;top:0;z-index:2;background:var(--surface)}.pane{overflow:visible;padding:16px}.post{border-right:0;border-bottom:1px solid var(--line)}.hint{display:none}h2{font-size:21px}.acts.stick{top:49px;margin:0 -16px;padding:8px 16px}}',
     '@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}'
   ].join('\n');
 
@@ -893,7 +894,7 @@
       }, function (e) { own.hid[id] = false; paintCard(id); say('Hiding did not work: ' + why(e)); });
     });
     paint();
-    return el('div', { class: 'acts' }, el('span', { class: 'pill vgrp' }, upB, sc, dnB), svB, cpB, hdB, msg);
+    return el('div', { class: 'acts stick' }, el('span', { class: 'pill vgrp' }, upB, sc, dnB), svB, cpB, hdB, msg);
   }
 
   function renderPost(d, pl) {
@@ -912,8 +913,8 @@
         p.upvote_ratio != null ? [dot(), el('span', { text: Math.round(p.upvote_ratio * 100) + '% upvoted' })] : null),
       el('h2', { text: p.title || '' }),
       chips.length ? el('div', { class: 'chips' }, chips) : null,
-      postBody(p),
-      postActions(p, pl)
+      postActions(p, pl),
+      postBody(p)
     );
     var thread = el('div', { class: 'thread' });
     d.comments.forEach(function (c) { var n = commentNode(c, pl); if (n) thread.appendChild(n); });

@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.12.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.12.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -21,7 +21,7 @@ Status: **v0.12.0, early.** Written against Reddit's page structure as measured 
 - **Community details.** On a community page, **About and rules** opens a side panel with the description, members, created date, community bookmarks, the rules (click to expand) and the full sidebar text. **Flairs** lists the community's flairs, and flair chips on cards are links that filter the feed with Reddit's own `?f=flair_name:"..."` address. An active filter shows as a chip you can click to clear.
 - **Saved posts in gold.** A saved post gets a gold bookmark and a gold outline. Posts you saved earlier are picked up from your saved list (`/user/NAME/saved.json`, up to 300).
 - **Vote colours.** An upvoted post gets a green arrow and a green outline; a downvoted one gets a red arrow and a red outline (saved posts keep a gold ring outside). Earlier votes are read from your own upvoted and downvoted lists (up to 200 each).
-- **Actions inside the lightbox post.** Upvote, downvote, Save, Copy link and Hide sit under the post text, and stay in step with the card behind. Hide moves on to the next post. The separate comment-count pill is gone (the comments column shows it).
+- **Actions inside the lightbox post.** Upvote, downvote, Save, Copy link and Hide sit in a bar pinned to the top of the post while its text scrolls, and stay in step with the card behind. Hide moves on to the next post. The separate comment-count pill is gone (the comments column shows it).
 - **Coloured comment threads.** Each reply level has its own colour on the thread line (blue, red, green, gold, purple, orange, then repeating).
 - **Community bar.** On a community page the bar now holds Create post (with a plus), About and rules, Flairs, Join / Joined and a "..." menu (add to favourites, add to a custom feed, copy link, open on Reddit). Reddit's own Create post, Join and "..." in the header are hidden because these replace them. Muting a community is not available here yet.
 - **Reading-order guide.** A faint line with a few arrows at its left sits between rows of cards, so it is clear where each new row starts.
