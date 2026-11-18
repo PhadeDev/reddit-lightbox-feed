@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.11.3
+// @version      0.12.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.11.3';
+  var VERSION = '0.12.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -545,6 +545,31 @@
 
   var HC = { data: {}, fol: {}, showT: 0, hideT: 0, cur: '', chat: 'not used yet' };
 
+  /* Start chat: the same call Reddit's own chat link component makes (read from
+     its code): the chat panel's openChatUrl with a path like /user/NAME. */
+  function openChatFor(e, path, fullUrl) {
+    if (e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var host = document.querySelector('reddit-chat-host');
+    if (!host || typeof host.openChatUrl !== 'function') {
+      HC.chat = 'chat panel not found, link left to open normally';
+      log('chat: ' + HC.chat);
+      return;
+    }
+    if (e.preventDefault) e.preventDefault();
+    try {
+      host.openChatUrl(path);
+      HC.chat = 'called the chat panel with ' + String(path).replace(/^\/user\/.*/, '/user/<name>');
+      log('chat: ' + HC.chat);
+      if (e.detail === 0 && host.updateComplete && host.updateComplete.then) {
+        host.updateComplete.then(function () { try { if (host.setFocusOnChatWidget) host.setFocusOnChatWidget(); } catch (x) { /* ignore */ } });
+      }
+    } catch (er) {
+      HC.chat = 'the chat panel refused, opened the chat page in a new tab';
+      log('chat: the chat panel refused:', er);
+      window.open(fullUrl, '_blank', 'noopener');
+    }
+  }
+
   function userAbout(name) {
     var k = String(name).toLowerCase();
     if (!HC.data[k]) {
@@ -569,15 +594,6 @@
     var pop = el('div', { class: 'hcard', role: 'dialog', 'aria-label': 'User details' });
     pop.style.display = 'none';
     rootNode.appendChild(pop);
-    /* Only record what happened to a Start chat click (for diagnostics). We do not
-       call Reddit's chat panel ourselves: a guessed call opened another person's old invite. */
-    pop.addEventListener('click', function (e) {
-      var t = e.target;
-      var a = t && t.closest ? t.closest('a[data-testid="private-chat-button"]') : null;
-      if (!a) return;
-      HC.chat = (HC.chat || '').split(' | ')[0] + ' | last click: ' + (e.defaultPrevented ? 'Reddit\'s component took it' : 'Reddit\'s component did not take it (link opens normally)');
-      log('chat:', HC.chat);
-    });
 
     function hideNow() { clearTimeout(HC.showT); pop.style.display = 'none'; HC.cur = ''; }
     function hide() { clearTimeout(HC.showT); clearTimeout(HC.hideT); HC.hideT = setTimeout(hideNow, 220); }
@@ -647,15 +663,10 @@
           });
           actions.push(fb);
         }
-        var chatA = el('a', { class: 'hb pri', href: 'https://chat.reddit.com/user/' + enc, target: '_blank', rel: 'noopener noreferrer', 'data-testid': 'private-chat-button', text: 'Start chat' });
+        var chatUrl = 'https://chat.reddit.com/user/' + enc;
+        var chatA = el('a', { class: 'hb pri', href: chatUrl, target: '_blank', rel: 'noopener noreferrer', 'data-testid': 'private-chat-button', text: 'Start chat' });
+        chatA.addEventListener('click', function (e) { openChatFor(e, '/user/' + enc, chatUrl); });
         var chatNode = chatA;
-        try {
-          if (typeof customElements !== 'undefined' && customElements.get('reddit-chat-anchor')) {
-            chatNode = el('reddit-chat-anchor', {}, chatA);
-            chatNode.style.display = 'contents';
-          }
-        } catch (er) { /* plain link */ }
-        HC.chat = chatNode === chatA ? 'Reddit chat component not found, plain link' : 'wrapped in Reddit\'s own chat link component';
         actions.push(chatNode);
         actions.push(el('a', { class: 'hb', href: '/user/' + enc + '/', text: 'View profile' }));
       }
