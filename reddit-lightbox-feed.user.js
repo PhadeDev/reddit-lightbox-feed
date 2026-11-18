@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.14.0
+// @version      0.14.1
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -12,6 +12,9 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @grant        GM_setClipboard
+// @grant        GM_xmlhttpRequest
+// @connect      fonts.googleapis.com
+// @connect      fonts.gstatic.com
 // @homepageURL  https://github.com/PhadeDev/reddit-lightbox-feed
 // @supportURL   https://github.com/PhadeDev/reddit-lightbox-feed/issues
 // @updateURL    https://raw.githubusercontent.com/PhadeDev/reddit-lightbox-feed/main/reddit-lightbox-feed.user.js
@@ -21,7 +24,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.14.0';
+  var VERSION = '0.14.1';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -184,18 +187,85 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Lexend: fetched once, kept in storage, added as a page font          */
+  /* ------------------------------------------------------------------ */
+
+  var FONTST = 'not started';
+
+  function gmFetch(url, type) {
+    return new Promise(function (resolve, reject) {
+      if (typeof GM_xmlhttpRequest !== 'function') { reject(new Error('the userscript manager cannot make this request')); return; }
+      GM_xmlhttpRequest({
+        method: 'GET', url: url, responseType: type || 'text', timeout: 20000,
+        onload: function (r) { if (r.status >= 200 && r.status < 300) resolve(r.response); else reject(new Error('HTTP ' + r.status)); },
+        onerror: function () { reject(new Error('network error')); },
+        ontimeout: function () { reject(new Error('timed out')); }
+      });
+    });
+  }
+
+  function bufToB64(buf) {
+    var u = new Uint8Array(buf), out = '', i;
+    for (i = 0; i < u.length; i += 0x8000) out += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(out);
+  }
+
+  function b64ToBuf(b) {
+    var t = atob(b), u = new Uint8Array(t.length), i;
+    for (i = 0; i < t.length; i++) u[i] = t.charCodeAt(i);
+    return u.buffer;
+  }
+
+  function isWoff2(buf) {
+    var u = new Uint8Array(buf);
+    return u.length > 1000 && u[0] === 0x77 && u[1] === 0x4F && u[2] === 0x46 && u[3] === 0x32;
+  }
+
+  function loadLexend() {
+    var cached = gm.get('lexendB64', '');
+    var source = 'storage';
+    var p;
+    if (cached) p = Promise.resolve(b64ToBuf(cached));
+    else {
+      source = 'downloaded';
+      p = gmFetch('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap').then(function (css) {
+        var m = /\/\*\s*latin\s*\*\/\s*@font-face\s*\{[^}]*?url\((https:[^)]+)\)/.exec(String(css));
+        if (!m) throw new Error('the font list had no Latin file');
+        return gmFetch(m[1], 'arraybuffer');
+      }).then(function (buf) {
+        if (!isWoff2(buf)) throw new Error('the font file was not what was expected');
+        try { gm.set('lexendB64', bufToB64(buf)); } catch (e) { /* not cached */ }
+        return buf;
+      });
+    }
+    FONTST = 'loading (' + source + ')';
+    return p.then(function (buf) {
+      if (typeof FontFace !== 'function' || !document.fonts) throw new Error('this browser cannot add fonts from a file');
+      var face = new FontFace('LBX Lexend', buf, { weight: '100 900', style: 'normal' });
+      return face.load();
+    }).then(function (face) {
+      document.fonts.add(face);
+      FONTST = 'ready (' + source + ')';
+      log('font: Lexend ready (' + source + ')');
+    }).catch(function (err) {
+      if (cached) { try { gm.set('lexendB64', ''); } catch (e) { /* ignore */ } }
+      FONTST = 'failed: ' + String((err && err.message) || err);
+      log('font: Lexend not loaded:', FONTST);
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Settings and menu                                                  */
   /* ------------------------------------------------------------------ */
 
   var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true), extra: gm.get('extra', false), homeSort: gm.get('homeSort', 'hot'), notifs: gm.get('notifs', true), font: gm.get('font', true) };
 
-  /* Lexend is used from the fonts installed on this PC (nothing is downloaded);
-     if it is not installed the normal fonts are used. */
+  /* Lexend: downloaded once from Google Fonts (an open font), kept in this
+     script's own storage and added to the page. A copy installed on this PC is
+     tried too, and if neither is there the normal fonts are used. */
   var SYS_FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
   var FONT_STACK = cfg.font ? "'LBX Lexend','Lexend Medium','Lexend'," + SYS_FONT : SYS_FONT;
   var FONT_CSS = [
-    "@font-face{font-family:'LBX Lexend';font-weight:100 500;font-style:normal;src:local('Lexend Medium'),local('Lexend-Medium'),local('Lexend Regular'),local('Lexend')}",
-    "@font-face{font-family:'LBX Lexend';font-weight:600 900;font-style:normal;src:local('Lexend SemiBold'),local('Lexend-SemiBold'),local('Lexend Bold'),local('Lexend-Bold'),local('Lexend Medium'),local('Lexend')}",
     'html.lbx-font,html.lbx-font body,html.lbx-font *{font-family:' + FONT_STACK + ' !important}',
     'html.lbx-font code,html.lbx-font pre,html.lbx-font kbd,html.lbx-font samp{font-family:ui-monospace,Menlo,Consolas,monospace !important}'
   ].join('\n');
@@ -3294,7 +3364,7 @@
       o.push(T + 'community header (first div in #subgrid-container):');
       (function walkH(n, dp) { if (!n || dp > 3 || o.length > 400) return; Array.prototype.slice.call(n.children, 0, 6).forEach(function (k) { o.push(T + '  ' + new Array(dp + 1).join(' ') + box(k)); walkH(k, dp + 1); }); })(hd, 0);
     }
-    o.push(T + 'own cards shown=' + own.shown.length + ' failed=' + (own.failed || 'no') + ' lastAction=' + ACT.last + ' chat=' + HC.chat + ' extraData=' + (!cfg.extra ? 'off' : own.apiOk >= 0 ? 'ok(' + own.apiOk + ')' : (own.apiDead || 'untried')) + ' html.lbx-own=' + docEl().classList.contains('lbx-own') +
+    o.push(T + 'own cards shown=' + own.shown.length + ' failed=' + (own.failed || 'no') + ' lastAction=' + ACT.last + ' chat=' + HC.chat + ' font=' + (cfg.font ? FONTST : 'off') + ' extraData=' + (!cfg.extra ? 'off' : own.apiOk >= 0 ? 'ok(' + own.apiOk + ')' : (own.apiDead || 'untried')) + ' html.lbx-own=' + docEl().classList.contains('lbx-own') +
       ' rail=' + (rail.host ? 'built' : 'no') + ' communities=' + (rail.subs ? rail.subs.length : 'n/a') + (rail.err ? ' railError=' + rail.err : '') +
       ' cfg=' + JSON.stringify(cfg));
     o.push(T + 'recent log:');
@@ -3500,7 +3570,7 @@
       if (gm.copy(t)) console.log('[lightbox] structure report copied to the clipboard (' + t.split('\n').length + ' lines)');
       else console.log(t);
     });
-    if (cfg.font) { docEl().classList.add('lbx-font'); gm.style(FONT_CSS); }
+    if (cfg.font) { docEl().classList.add('lbx-font'); gm.style(FONT_CSS); loadLexend(); }
     if (cfg.layout) gm.style(LAYOUT_CSS);
     if (cfg.cards && cfg.layout) {
       docEl().classList.add('lbx-wait');
@@ -3525,7 +3595,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, fontStack: FONT_STACK, fontCss: FONT_CSS, ncss: NCSS, nt: function () { return NT; }, cp: function () { return CP; }, openNotif: openNotif, closeNotif: closeNotif, onBellClick: onBellClick, markAllRead: markAllRead, openPermalink: openPermalink, setMuted: setMuted, isMuted: isMuted, openMutedMenu: openMutedMenu, updateMutedBtn: updateMutedBtn, openCreate: openCreate, submitCreate: submitCreate, ntTitle: ntTitle, ntPostPath: ntPostPath, railWanted: railWanted, hc: function () { return HC; }, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, loadLexend: loadLexend, fontState: function () { return FONTST; }, fontStack: FONT_STACK, fontCss: FONT_CSS, ncss: NCSS, nt: function () { return NT; }, cp: function () { return CP; }, openNotif: openNotif, closeNotif: closeNotif, onBellClick: onBellClick, markAllRead: markAllRead, openPermalink: openPermalink, setMuted: setMuted, isMuted: isMuted, openMutedMenu: openMutedMenu, updateMutedBtn: updateMutedBtn, openCreate: openCreate, submitCreate: submitCreate, ntTitle: ntTitle, ntPostPath: ntPostPath, railWanted: railWanted, hc: function () { return HC; }, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }

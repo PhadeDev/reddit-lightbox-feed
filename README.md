@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.14.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.14.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -32,7 +32,7 @@ Status: **v0.14.0, early.** Written against Reddit's page structure as measured 
 - **Create post inside the page.** The Create post button opens a form for text and link posts (community, title, text or link, flair if the community has them, NSFW and spoiler). Errors from Reddit are shown and your text is kept; a post is never sent twice automatically. Images and polls still need Reddit's own form (link at the bottom of the dialog).
 - **Mute and "show fewer" (this script only).** The card "..." menu and the community "..." menu can hide a community from your feed here. It is not sent to Reddit and does not change what Reddit shows elsewhere. A "Muted (N)" button in the bar lists them for unmuting. Reddit's own "Show fewer posts like this" and Mute are not available to scripts as far as I know.
 - **Award.** The card menu has "Give an award", which opens the post on Reddit. The script never spends your coins.
-- **Lexend font.** All the script's own screens (cards, lightbox, hover card, notifications, menus) and the rest of the page use Lexend, taken from the fonts installed on your PC (nothing is downloaded). If Lexend is not installed, the normal fonts are used. Parts of Reddit drawn inside its own components may keep Reddit's font. Switch it off from the Violentmonkey menu ("Font Lexend").
+- **Lexend font.** All the script's own screens and the rest of the page use Lexend. The first time, the script downloads Lexend (an open font) from Google Fonts: one request to fonts.googleapis.com for the font list and one to fonts.gstatic.com for the Latin file (about 40 KB). It is then kept in the script's own storage and added to the page, so later page loads need no network. A copy of Lexend installed on your PC is also tried, and if neither works the normal fonts are used (the Violentmonkey diagnostics show "font="). Parts of Reddit drawn inside its own components may keep Reddit's font. Switch it off from the Violentmonkey menu ("Font Lexend").
 - **Quick start.** Which posts you saved or voted on is remembered between visits, so cards show their gold or green/red state on the first paint, then it is refreshed from Reddit in the background. Reddit's own post-detail requests (which it refuses) are no longer tried.
 - **Look.** Stronger buttons (purple with a gold Create post link and a gold active sort tab), and on community pages the banner fades into the page (a mask on Reddit's own banner image).
 - **Create post** is a link to Reddit's submit page for that community, not an inline form.
@@ -60,7 +60,7 @@ Click the userscript manager's icon while on Reddit to see the script's menu:
 
 ## Privacy
 
-Nothing is sent anywhere except to Reddit itself. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: optional extra post details (`/by_id/`, `/api/info`; Reddit currently refuses these, and cards do not need them), a post's comments (`<post>.json`), your community list (`/subreddits/mine/subscriber.json`), the account age and karma of a user you hover (`/user/NAME/about.json`), and for a community page its `about.json`, `about/rules.json`, `api/widgets` and `api/link_flair_v2.json`. It stores only its on/off settings and whether the rail is expanded.
+Nothing is sent anywhere except to Reddit itself, apart from the one-off Lexend font download from Google Fonts described above. The script requests public data addresses on `www.reddit.com` from your own browser, using your normal Reddit login: optional extra post details (`/by_id/`, `/api/info`; Reddit currently refuses these, and cards do not need them), a post's comments (`<post>.json`), your community list (`/subreddits/mine/subscriber.json`), the account age and karma of a user you hover (`/user/NAME/about.json`), and for a community page its `about.json`, `about/rules.json`, `api/widgets` and `api/link_flair_v2.json`. It stores only its on/off settings and whether the rail is expanded.
 
 ## Layout of this repository
 
