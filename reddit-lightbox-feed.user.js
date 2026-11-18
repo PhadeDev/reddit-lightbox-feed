@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.15.1
+// @version      0.15.2
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -24,7 +24,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.15.1';
+  var VERSION = '0.15.2';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -2957,7 +2957,7 @@
       own.mutedB = el('button', { class: 'sg', type: 'button', 'aria-haspopup': 'menu', text: 'Muted (0)' });
       own.mutedB.style.display = 'none';
       own.mutedB.addEventListener('click', function () { openMutedMenu(own.mutedB); });
-      own.br = el('div', { class: 'br' }, own.bellB, own.mutedB, own.sg);
+      own.br = el('div', { class: 'br' }, own.mutedB, own.sg);
       own.bar = el('div', { class: 'bar' }, own.left, own.center, own.br);
       own.sg.addEventListener('click', toggleSugg);
       own.root.appendChild(own.bar);
