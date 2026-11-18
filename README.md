@@ -2,7 +2,7 @@
 
 A userscript for Reddit's current ("modern") web design. It replaces the narrow single-column feed with a full-width grid of cards in a cleaner style, collapses the left menu into an icon rail, and opens posts in a lightbox, with the comments beside them, so you never leave the page.
 
-Status: **v0.12.1, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
+Status: **v0.13.0, early.** Written against Reddit's page structure as measured on 16/11/2026 and tested against a stand-in page, but not yet tried on the live site. Expect a round or two of fixes. `design/mockup.html` is the look it is aiming for.
 
 ## What it does
 
@@ -28,13 +28,17 @@ Status: **v0.12.1, early.** Written against Reddit's page structure as measured 
 - **Home button opens Hot.** The Home icon in the left rail goes to /hot/ (your subscribed communities, sorted Hot). Switch it back to Reddit's own home from the Violentmonkey menu ("Home button opens").
 - **One sort control.** Reddit's own sort dropdowns are hidden on feed pages. The sort bar highlights your current sort even when the address has none, and choosing Top shows a second bar: Now, Today, This Week, This Month, This Year, All Time.
 - **Posting a comment.** After you post, a green line says "Comment posted", the new comment appears at once (highlighted for a moment) and the comment count goes up. If Reddit refuses, the reason shows both under the box and in the status line, and your text stays. If Reddit does not send a copy back, your own words are shown with a note to refresh.
+- **Notifications dropdown.** The bell in the bar (and Reddit's own bell in the header) opens a dropdown of your classic inbox: replies, mentions and messages with unread dots. Clicking one marks it read on Reddit and opens the post in the lightbox; "Mark all read" is there too. It does not cover Reddit's newer alerts (trending, new post in a community); the footer links to Reddit's full page. Switch it off from the Violentmonkey menu if you prefer Reddit's own.
+- **Create post inside the page.** The Create post button opens a form for text and link posts (community, title, text or link, flair if the community has them, NSFW and spoiler). Errors from Reddit are shown and your text is kept; a post is never sent twice automatically. Images and polls still need Reddit's own form (link at the bottom of the dialog).
+- **Mute and "show fewer" (this script only).** The card "..." menu and the community "..." menu can hide a community from your feed here. It is not sent to Reddit and does not change what Reddit shows elsewhere. A "Muted (N)" button in the bar lists them for unmuting. Reddit's own "Show fewer posts like this" and Mute are not available to scripts as far as I know.
+- **Award.** The card menu has "Give an award", which opens the post on Reddit. The script never spends your coins.
 - **Quick start.** Which posts you saved or voted on is remembered between visits, so cards show their gold or green/red state on the first paint, then it is refreshed from Reddit in the background. Reddit's own post-detail requests (which it refuses) are no longer tried.
 - **Look.** Stronger buttons (purple with a gold Create post link and a gold active sort tab), and on community pages the banner fades into the page (a mask on Reddit's own banner image).
 - **Create post** is a link to Reddit's submit page for that community, not an inline form.
 - **Suggested communities.** Hidden by default; a small "Suggested communities" button above the cards shows or hides the strip.
 - **Safe fallback.** If the cards cannot be drawn, the script goes back to showing Reddit's own cards in a plain grid and says why in the diagnostics.
 
-Not yet: the notifications dropdown, trimming the community banner, Award, and "Show fewer posts like this". Reddit's header, profile menu and chat are left alone.
+Not yet: image and poll posts, Reddit's own Mute and "Show fewer posts like this", and the newer alert types in the dropdown. Reddit's header, profile menu and chat are left alone.
 
 ## Install and update (Violentmonkey or Tampermonkey)
 

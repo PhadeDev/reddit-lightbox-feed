@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.12.2
+// @version      0.13.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.12.2';
+  var VERSION = '0.13.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -135,6 +135,7 @@
     hide: 'M3 3l18 18M10.6 5.2A9.5 9.5 0 0 1 12 5c6 0 9.5 7 9.5 7a15 15 0 0 1-2.6 3.3M6.4 6.5C3.9 8.2 2.5 12 2.5 12S6 19 12 19a9 9 0 0 0 4-1M9.9 9.9a3 3 0 0 0 4.2 4.2',
     more: 'M5 12h.01M12 12h.01M19 12h.01',
     plus: 'M12 5v14M5 12h14',
+    bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21a2 2 0 0 0 4 0',
     reply: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 6 6v3'
   };
 
@@ -186,7 +187,7 @@
   /* Settings and menu                                                  */
   /* ------------------------------------------------------------------ */
 
-  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true), extra: gm.get('extra', false), homeSort: gm.get('homeSort', 'hot') };
+  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true), extra: gm.get('extra', false), homeSort: gm.get('homeSort', 'hot'), notifs: gm.get('notifs', true) };
 
   /* ------------------------------------------------------------------ */
   /* Layout (CSS only, scoped to pages that contain a feed)             */
@@ -1018,7 +1019,7 @@
         ME.p = null;
         return once();
       }
-      if (e && e.status >= 500 && path !== '/api/comment') {
+      if (e && e.status >= 500 && path !== '/api/comment' && path !== '/api/submit') {
         log('Reddit server error ' + e.status + ', trying once more');
         return new Promise(function (res) { setTimeout(res, 700); }).then(once);
       }
@@ -1332,6 +1333,26 @@
     '.rowsep::after{content:"\\203A \\203A \\203A";position:absolute;left:0;top:50%;transform:translateY(-50%);padding:0 10px 0 2px;background:var(--color-neutral-background,#0e1113);color:var(--accent);opacity:.8;font-size:12px;letter-spacing:2px}',
     '.sg.cta{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}',
     '.sg.cta:hover{filter:brightness(1.1);background:var(--gold);color:var(--gold-ink)}',
+    '.br{display:flex;gap:8px;align-items:center;justify-self:end}',
+    '.bell{position:relative}',
+    '.bell .ic{margin-right:0}',
+    '.bn{position:absolute;top:-6px;right:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:var(--down);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}',
+    '.card.muted{display:none}',
+    '.cpost{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:16px}',
+    '.cp-scrim{position:absolute;inset:0;background:rgba(8,5,8,.72)}',
+    '.cp-dlg{position:relative;width:min(640px,100%);max-height:92vh;overflow:auto;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 24px 80px rgba(0,0,0,.5)}',
+    '.cp-dlg h2{margin:0;font-size:18px}',
+    '.cp-row{display:flex;gap:8px;align-items:center}',
+    '.cp-row input[type=text]{flex:1}',
+    '.cp-dlg input[type=text],.cp-dlg input[type=url],.cp-dlg textarea,.cp-dlg select{width:100%;background:var(--surface2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}',
+    '.cp-dlg textarea{min-height:150px;resize:vertical}',
+    '.cp-pre{color:var(--muted);font-weight:600}',
+    '.cp-tabs{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:99px;align-self:flex-start}',
+    '.cp-tab{padding:4px 16px;border-radius:99px;color:var(--muted);font-weight:600;font-size:13px}',
+    '.cp-tab.on{background:var(--gold);color:var(--gold-ink)}',
+    '.cp-chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}',
+    '.cp-err{color:#ff9a9a;font-size:13px}',
+    '.cp-ok{color:var(--up);font-size:13px}',
     '.sentinel{height:2px}',
     '.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;background:var(--fg);color:var(--surface);padding:8px 16px;border-radius:99px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:calc(100vw - 32px)}',
     '@media (prefers-reduced-motion:reduce){*{transition:none!important}}'
@@ -1516,7 +1537,7 @@
   var own = {
     feed: null, host: null, root: null, grid: null, sentinel: null, toastEl: null,
     shown: [], have: {}, posts: new Map(), plToId: {}, cards: {}, votes: {}, v0: {},
-    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', times: null, center: null, joinB: null, joinL: null, moreB: null, subSt: null, rowT: 0, rowW: 0, ro: null, sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, vtouched: {}, voteMap: null, votesP: null, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
+    busy: false, failed: '', failAt: 0, apiOk: -1, apiDead: '', br: null, bellB: null, bellN: null, bellDone: false, mutedB: null, times: null, center: null, joinB: null, joinL: null, moreB: null, subSt: null, rowT: 0, rowW: 0, ro: null, sub: '', left: null, aboutB: null, flairB: null, fchip: null, about: null, aboutBody: null, aboutX: null, aboutSub: '', preT: 0, touched: {}, vtouched: {}, voteMap: null, votesP: null, savedSet: null, savedP: null, createB: null, hover: null, menu: null, menuId: '', saved: {}, hid: {}, fol: {}, pre: {}, bar: null, sg: null, sorts: null, sortKey: '~', mo: null, moT: 0, io: null, pokeAt: 0, toastT: 0
   };
 
   function toast(msg) {
@@ -1774,6 +1795,8 @@
     if (!c) return;
     c.classList.toggle('hid', !!own.hid[id]);
     c.classList.toggle('saved', !!own.saved[id]);
+    var mp = own.posts.get(id);
+    c.classList.toggle('muted', !!(mp && isMuted(mp.subreddit)));
     c.classList.toggle('vup', (own.votes[id] || 0) > 0);
     c.classList.toggle('vdn', (own.votes[id] || 0) < 0);
     var sv = c.querySelector('[data-act="save"]');
@@ -1860,6 +1883,8 @@
         toast('Link copied');
       }),
       link('Open on Reddit', url),
+      link('Give an award (opens the post on Reddit)', url),
+      item('Hide r/' + p.subreddit + ' from my feed (this script only)', function () { setMuted(p.subreddit, true); toast('r/' + p.subreddit + ' is hidden here. Undo it from "Muted" in the bar.'); }),
       link('Report (opens the post on Reddit)', url));
     var r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { right: 300, bottom: 100, top: 100 };
     own.menu.style.display = 'flex';
@@ -1883,7 +1908,7 @@
   function openOwn(id) {
     var p = own.posts.get(id);
     if (!p) return;
-    var vis = own.shown.filter(function (i) { return !own.hid[i]; });
+    var vis = own.shown.filter(function (i) { var q = own.posts.get(i); return !own.hid[i] && !(q && isMuted(q.subreddit)); });
     S.list = vis.map(function (i) { return own.posts.get(i).permalink; });
     S.idx = vis.indexOf(id);
     show(p.permalink, p.title);
@@ -2330,6 +2355,11 @@
       }));
     } else items.push(el('div', { class: 'mi dis', text: 'Join this community to add it to favourites' }));
     items.push(menuItem('Add to custom feed...', function () { openFeedChooser(btn, sub); }));
+    items.push(menuItem(isMuted(sub) ? 'Unmute r/' + sub + ' in my feed' : 'Mute r/' + sub + ' in my feed (this script only)', function () {
+      closeMenu();
+      setMuted(sub, !isMuted(sub));
+      toast(isMuted(sub) ? 'r/' + sub + ' is hidden here' : 'Unmuted r/' + sub);
+    }));
     items.push(menuItem('Copy community link', function () {
       var url = location.origin + '/r/' + encodeURIComponent(sub) + '/';
       if (!gm.copy(url) && navigator.clipboard) navigator.clipboard.writeText(url).catch(function () { /* ignore */ });
@@ -2371,7 +2401,7 @@
     var g = own.grid;
     if (!g) return;
     Array.prototype.slice.call(g.querySelectorAll('.rowsep')).forEach(function (x) { if (x.parentNode) x.parentNode.removeChild(x); });
-    var cards = Array.prototype.slice.call(g.querySelectorAll('.card'));
+    var cards = Array.prototype.slice.call(g.querySelectorAll('.card')).filter(function (c) { return !(c.classList && c.classList.contains('muted')); });
     var rowTop = null, firsts = [];
     cards.forEach(function (c) {
       var top = c.offsetTop || 0;
@@ -2397,6 +2427,363 @@
       own.ro = { disconnect: function () { /* none */ } };
       if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('resize', schedRows);
     }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Muted communities (hidden in this script only, nothing sent to Reddit) */
+  /* ------------------------------------------------------------------ */
+
+  var MUTE = { map: null };
+
+  function mutedMap() {
+    if (!MUTE.map) {
+      MUTE.map = {};
+      try { JSON.parse(gm.get('muted', '[]') || '[]').forEach(function (n) { MUTE.map[String(n).toLowerCase()] = String(n); }); } catch (e) { /* ignore */ }
+    }
+    return MUTE.map;
+  }
+
+  function isMuted(sub) { return !!(sub && mutedMap()[String(sub).toLowerCase()]); }
+
+  function updateMutedBtn() {
+    if (!own.mutedB) return;
+    var n = Object.keys(mutedMap()).length;
+    own.mutedB.style.display = n ? '' : 'none';
+    own.mutedB.textContent = 'Muted (' + n + ')';
+  }
+
+  function setMuted(sub, on) {
+    var k = String(sub).toLowerCase();
+    if (on) mutedMap()[k] = String(sub); else delete mutedMap()[k];
+    gm.set('muted', JSON.stringify(Object.keys(mutedMap()).map(function (x) { return mutedMap()[x]; })));
+    own.shown.forEach(paintCard);
+    updateMutedBtn();
+    schedRows();
+  }
+
+  function openMutedMenu(btn) {
+    menuShell();
+    if (own.menuId === 'muted' && own.menu.style.display !== 'none') { closeMenu(); return; }
+    own.menuId = 'muted';
+    var names = Object.keys(mutedMap()).map(function (k) { return mutedMap()[k]; });
+    var kids = [el('div', { class: 'mi dis', text: 'Hidden from your feed in this script:' })];
+    names.forEach(function (n) { kids.push(menuItem('Unmute r/' + n, function () { closeMenu(); setMuted(n, false); toast('Unmuted r/' + n); })); });
+    if (!names.length) kids.push(el('div', { class: 'mi', text: 'No muted communities.' }));
+    setKids(own.menu, kids);
+    own.menu.style.maxHeight = '';
+    own.menu.style.overflowY = '';
+    placeMenu(btn, 260);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Opening a post by its address (used by notifications and new posts) */
+  /* ------------------------------------------------------------------ */
+
+  function openPermalink(pl, title) {
+    if (!pl) return;
+    S.list = [pl];
+    S.idx = 0;
+    show(pl, title || '');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Notifications dropdown, from the classic inbox                      */
+  /* ------------------------------------------------------------------ */
+
+  var NT = { host: null, root: null, panel: null, list: null, sub: null, items: null, open: false, err: '' };
+
+  var NCSS = TOK + [
+    '.np{width:min(400px,calc(100vw - 24px));max-height:min(72vh,640px);display:flex;flex-direction:column;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);outline:none;overflow:hidden}',
+    '.nh{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}',
+    '.sp3{flex:1}',
+    '.nsub{color:var(--muted);font-size:12px}',
+    '.nbtn{padding:4px 12px;border-radius:99px;border:1px solid var(--accent);background:var(--accent-bg);font-size:12px;font-weight:600}',
+    '.nbtn:hover{background:var(--accent);color:var(--gold-ink)}',
+    '.nx{width:28px;height:28px;border-radius:99px;display:grid;place-items:center;color:var(--muted)}',
+    '.nlist{overflow:auto;display:flex;flex-direction:column}',
+    '.nit{display:flex;gap:10px;text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);width:100%;align-items:flex-start}',
+    '.nit:hover{background:var(--surface2)}',
+    '.nit .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);margin-top:6px;flex:none;visibility:hidden}',
+    '.nit.new .dot{visibility:visible}',
+    '.nit .nt{font-weight:600;font-size:13px;overflow-wrap:anywhere}',
+    '.nit .nb{color:var(--muted);font-size:12px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+    '.nit .nw{color:var(--muted);font-size:11px;margin-top:2px}',
+    '.nmsg{padding:18px;color:var(--muted);text-align:center;font-size:13px}',
+    '.nmsg.er{color:#ff9a9a}',
+    '.nf{display:block;padding:10px 14px;text-align:center;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;border-top:1px solid var(--line)}'
+  ].join('\n');
+
+  function ntTitle(d) {
+    var who = d.author ? 'u/' + d.author : 'Someone';
+    var where = d.subreddit_name_prefixed ? ' in ' + d.subreddit_name_prefixed : '';
+    if (d.was_comment === false || /^t4_/.test(String(d.name || ''))) return 'Message from ' + who + (d.subject ? ': ' + d.subject : '');
+    if (d.type === 'post_reply') return who + ' replied to your post' + where;
+    if (d.type === 'username_mention') return who + ' mentioned you' + where;
+    return who + ' replied to your comment' + where;
+  }
+
+  function ntPostPath(ctx) {
+    var m = /^(\/r\/[^\/?#]+\/comments\/[a-z0-9]+\/[^\/?#]*\/?)/i.exec(String(ctx || ''));
+    return m ? m[1].replace(/\/?$/, '/') : '';
+  }
+
+  function setBell(n) {
+    if (!own.bellN) return;
+    own.bellN.textContent = n > 99 ? '99+' : String(n);
+    own.bellN.style.display = n ? '' : 'none';
+  }
+
+  function refreshBell() {
+    if (!own.bellN || own.bellDone) return;
+    own.bellDone = true;
+    getMe().then(function (d) { setBell(parseInt(d.inbox_count, 10) || 0); }, function () { own.bellDone = false; });
+  }
+
+  function ntUnread() {
+    return (NT.items || []).filter(function (d) { return d.new; }).length;
+  }
+
+  function ntCounts() {
+    var n = ntUnread();
+    if (NT.sub) NT.sub.textContent = NT.items ? (n ? n + ' unread' : 'all read') : '';
+    if (NT.items && NT.items.length < 30) setBell(n);
+  }
+
+  function renderNotif() {
+    if (!NT.list) return;
+    var kids = [];
+    (NT.items || []).forEach(function (d) {
+      var body = String(d.body || '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~\`>#]/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 180);
+      var b = el('button', { class: 'nit' + (d.new ? ' new' : ''), type: 'button' }, el('span', { class: 'dot' }),
+        el('span', {}, el('div', { class: 'nt', text: ntTitle(d) }), body ? el('div', { class: 'nb', text: body }) : null, el('div', { class: 'nw', text: ago(d.created_utc) })));
+      b.addEventListener('click', function () {
+        var pl = ntPostPath(d.context);
+        if (d.new && d.name) {
+          d.new = false;
+          b.className = 'nit';
+          ntCounts();
+          postApi('/api/read_message', { id: d.name }).catch(function () { /* leave it read here */ });
+        }
+        if (pl) { closeNotif(); openPermalink(pl, d.link_title); } else window.open('/message/inbox/', '_blank', 'noopener');
+      });
+      kids.push(b);
+    });
+    if (!kids.length) kids.push(el('div', { class: 'nmsg', text: 'Nothing in your inbox.' }));
+    setKids(NT.list, kids);
+    ntCounts();
+  }
+
+  function loadNotif() {
+    setKids(NT.list, el('div', { class: 'nmsg', text: 'Loading...' }));
+    getJson('/message/inbox.json?limit=30&raw_json=1').then(function (j) {
+      NT.items = ((j && j.data && j.data.children) || []).map(function (c) { return c && c.data; }).filter(Boolean);
+      NT.err = '';
+      renderNotif();
+    }, function (e) {
+      NT.err = String((e && e.message) || e);
+      setKids(NT.list, el('div', { class: 'nmsg er', text: 'Could not load notifications: ' + NT.err }));
+    });
+  }
+
+  function markAllRead() {
+    (NT.items || []).forEach(function (d) { d.new = false; });
+    renderNotif();
+    setBell(0);
+    postApi('/api/read_all_messages', {}).catch(function (e) {
+      if (NT.list) setKids(NT.list, el('div', { class: 'nmsg er', text: 'Marking as read did not work: ' + String((e && e.message) || e) }));
+    });
+  }
+
+  function ensureNotif() {
+    if (NT.host) return;
+    NT.host = el('div', { id: 'lbx-notif-host' });
+    NT.host.style.cssText = 'position:fixed;top:60px;right:12px;z-index:2147482000;display:none;';
+    NT.root = NT.host.attachShadow({ mode: 'open' });
+    adopt(NT.root, NCSS);
+    NT.sub = el('span', { class: 'nsub' });
+    NT.list = el('div', { class: 'nlist' });
+    var all = el('button', { class: 'nbtn', type: 'button', text: 'Mark all read' });
+    all.addEventListener('click', markAllRead);
+    NT.panel = el('section', { class: 'np', role: 'dialog', 'aria-label': 'Notifications', tabindex: '-1' },
+      el('div', { class: 'nh' }, el('b', { text: 'Notifications' }), NT.sub, el('span', { class: 'sp3' }), all,
+        el('button', { class: 'nx', type: 'button', 'aria-label': 'Close notifications', onclick: function () { closeNotif(); } }, svg(IC.x))),
+      NT.list,
+      el('a', { class: 'nf', href: '/notifications', target: '_blank', rel: 'noopener', text: 'See all notifications on Reddit' }));
+    NT.root.appendChild(NT.panel);
+    NT.panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeNotif(); });
+    document.body.appendChild(NT.host);
+  }
+
+  function ntOutside(e) {
+    var path = e.composedPath ? e.composedPath() : [];
+    if (NT.host && path.indexOf(NT.host) >= 0) return;
+    if (own.bellB && path.indexOf(own.bellB) >= 0) return;
+    for (var i = 0; i < path.length; i++) { if (path[i] && path[i].tagName === 'A' && /^notifications-inbox/.test(String(path[i].getAttribute('id') || ''))) return; }
+    closeNotif();
+  }
+
+  function openNotif() {
+    ensureNotif();
+    NT.host.setAttribute('data-theme', themeNow());
+    NT.host.style.display = 'block';
+    NT.open = true;
+    if (NT.panel.focus) NT.panel.focus({ preventScroll: true });
+    loadNotif();
+    setTimeout(function () { if (NT.open) document.addEventListener('click', ntOutside, true); }, 0);
+  }
+
+  function closeNotif() {
+    if (!NT.host) return;
+    NT.host.style.display = 'none';
+    NT.open = false;
+    document.removeEventListener('click', ntOutside, true);
+  }
+
+  function toggleNotif() { if (NT.open) closeNotif(); else openNotif(); }
+
+  /* Reddit's own bell in the header opens this dropdown instead of the page */
+  function onBellClick(e) {
+    if (!cfg.notifs || e.defaultPrevented || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var path = e.composedPath ? e.composedPath() : [];
+    if (NT.host && path.indexOf(NT.host) >= 0) return;
+    for (var i = 0; i < path.length; i++) {
+      var n = path[i];
+      if (n && n.tagName === 'A' && /^notifications-inbox/.test(String(n.getAttribute('id') || ''))) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleNotif();
+        return;
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Create a post (text or link) without leaving the page               */
+  /* ------------------------------------------------------------------ */
+
+  var CP = { wrap: null, kind: 'self', ft: {}, path: '', postTitle: '' };
+
+  function cpSub() { return String((CP.sub && CP.sub.value) || '').trim().replace(/^\/?r\//i, ''); }
+
+  function setCpKind(k) {
+    CP.kind = k;
+    CP.tabSelf.className = 'cp-tab' + (k === 'self' ? ' on' : '');
+    CP.tabLink.className = 'cp-tab' + (k === 'link' ? ' on' : '');
+    CP.body.style.display = k === 'self' ? '' : 'none';
+    CP.url.style.display = k === 'link' ? '' : 'none';
+  }
+
+  function cpMsg(text, bad) {
+    CP.msg.textContent = text || '';
+    CP.msg.className = bad ? 'cp-err' : 'cp-ok';
+    CP.msg.style.display = text ? '' : 'none';
+  }
+
+  function loadCpFlairs() {
+    var sub = cpSub();
+    CP.flair.style.display = 'none';
+    CP.ft = {};
+    if (!/^[A-Za-z0-9_]{2,21}$/.test(sub)) return;
+    getJson('/r/' + encodeURIComponent(sub) + '/api/link_flair_v2.json').then(function (list) {
+      if (cpSub() !== sub) return;
+      var opts = [el('option', { value: '', text: 'No flair' })];
+      (Array.isArray(list) ? list : []).forEach(function (x) {
+        if (x && x.id && x.text) { CP.ft[x.id] = String(x.text).trim(); opts.push(el('option', { value: x.id, text: String(x.text).trim() })); }
+      });
+      if (opts.length > 1) { setKids.apply(null, [CP.flair].concat(opts)); CP.flair.style.display = ''; }
+    }, function () { /* no flair list: posting still works if the community does not need one */ });
+  }
+
+  function closeCreate() { if (CP.wrap) CP.wrap.style.display = 'none'; }
+
+  function submitCreate() {
+    if (CP.go.disabled) return;
+    var sub = cpSub();
+    var title = String(CP.title.value || '').trim();
+    if (!/^[A-Za-z0-9_]{2,21}$/.test(sub)) { cpMsg('Choose a community (letters, numbers and underscores).', true); return; }
+    if (!title) { cpMsg('Add a title.', true); return; }
+    var f = { kind: CP.kind, sr: sub, title: title, resubmit: 'true', sendreplies: 'true', raw_json: '1' };
+    if (CP.kind === 'link') {
+      var raw = String(CP.url.value || '').trim();
+      var u = /^https?:\/\//i.test(raw) ? safeHref(raw) : '';
+      if (!u) { cpMsg('Add a link starting with http:// or https://', true); return; }
+      f.url = u;
+    } else f.text = String(CP.body.value || '');
+    if (CP.nsfw.checked) f.nsfw = 'true';
+    if (CP.spoiler.checked) f.spoiler = 'true';
+    var fid = String(CP.flair.value || '');
+    if (fid) { f.flair_id = fid; if (CP.ft[fid]) f.flair_text = CP.ft[fid]; }
+    CP.go.disabled = true;
+    CP.go.textContent = 'Posting...';
+    cpMsg('', false);
+    postApi('/api/submit', f).then(function (j) {
+      var data = j && j.json && j.json.data;
+      var url = data && data.url ? String(data.url) : '';
+      var path = '';
+      try { path = url ? new URL(url, location.origin).pathname : ''; } catch (e) { path = ''; }
+      CP.path = path;
+      CP.postTitle = title;
+      CP.openB.style.display = path ? '' : 'none';
+      cpMsg(path ? 'Posted.' : 'Posted. Reddit did not send the address back, so check your profile.', false);
+      CP.title.value = ''; CP.body.value = ''; CP.url.value = '';
+    }, function (e) {
+      cpMsg('Not posted: ' + String((e && e.message) || e), true);
+    }).then(function () {
+      CP.go.disabled = false;
+      CP.go.textContent = 'Post';
+    });
+  }
+
+  function ensureCreate() {
+    if (CP.wrap) return;
+    CP.sub = el('input', { type: 'text', placeholder: 'community', 'aria-label': 'Community', maxlength: '24', autocomplete: 'off' });
+    CP.title = el('input', { type: 'text', placeholder: 'Title', 'aria-label': 'Title', maxlength: '300' });
+    CP.body = el('textarea', { placeholder: 'Text (optional)', 'aria-label': 'Post text', maxlength: '40000' });
+    CP.url = el('input', { type: 'url', placeholder: 'https://', 'aria-label': 'Link address' });
+    CP.nsfw = el('input', { type: 'checkbox' });
+    CP.spoiler = el('input', { type: 'checkbox' });
+    CP.flair = el('select', { 'aria-label': 'Flair' });
+    CP.flair.style.display = 'none';
+    CP.msg = el('div', { class: 'cp-err', role: 'alert' });
+    CP.msg.style.display = 'none';
+    CP.tabSelf = el('button', { class: 'cp-tab on', type: 'button', text: 'Text' });
+    CP.tabLink = el('button', { class: 'cp-tab', type: 'button', text: 'Link' });
+    CP.tabSelf.addEventListener('click', function () { setCpKind('self'); });
+    CP.tabLink.addEventListener('click', function () { setCpKind('link'); });
+    CP.go = el('button', { class: 'sg cta', type: 'button', text: 'Post' });
+    CP.go.addEventListener('click', submitCreate);
+    CP.openB = el('button', { class: 'sg', type: 'button', text: 'Open your post' });
+    CP.openB.style.display = 'none';
+    CP.openB.addEventListener('click', function () { closeCreate(); openPermalink(CP.path, CP.postTitle); });
+    CP.sub.addEventListener('change', loadCpFlairs);
+    var full = el('a', { class: 'sg', href: '/submit/', target: '_blank', rel: 'noopener', text: 'Open the full form on Reddit' });
+    var dlg = el('div', { class: 'cp-dlg', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Create post' },
+      el('div', { class: 'cp-row' }, el('h2', { text: 'Create post' }), el('span', { class: 'sp2' }),
+        el('button', { class: 'ib2', type: 'button', 'aria-label': 'Close', onclick: function () { closeCreate(); } }, svg(IC.x))),
+      el('div', { class: 'cp-row' }, el('span', { class: 'cp-pre', text: 'r/' }), CP.sub),
+      el('div', { class: 'cp-tabs' }, CP.tabSelf, CP.tabLink),
+      CP.title, CP.body, CP.url, CP.flair,
+      el('div', { class: 'cp-row' }, el('label', { class: 'cp-chk' }, CP.nsfw, 'NSFW'), el('label', { class: 'cp-chk' }, CP.spoiler, 'Spoiler')),
+      CP.msg,
+      el('div', { class: 'cp-row' }, CP.go, CP.openB, el('span', { class: 'sp2' }), full));
+    CP.url.style.display = 'none';
+    CP.wrap = el('div', { class: 'cpost' }, el('div', { class: 'cp-scrim', onclick: function () { closeCreate(); } }), dlg);
+    CP.wrap.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); closeCreate(); }
+      else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); submitCreate(); }
+    });
+    own.root.appendChild(CP.wrap);
+  }
+
+  function openCreate() {
+    ensureCreate();
+    var sub = own.sub && !/^(popular|all|home)$/i.test(own.sub) ? own.sub : '';
+    if (sub) CP.sub.value = sub;
+    CP.wrap.style.display = 'flex';
+    cpMsg('', false);
+    CP.openB.style.display = 'none';
+    loadCpFlairs();
+    if (CP.title.focus) CP.title.focus();
   }
 
   function toggleSugg() {
@@ -2427,13 +2814,27 @@
       own.aboutB.addEventListener('click', function () { if (own.sub) openAbout(own.sub); });
       own.flairB.addEventListener('click', function () { if (own.sub) openFlairs(own.sub, own.flairB); });
       own.createB = el('a', { class: 'sg cta', href: '/submit/' }, svg(IC.plus), el('span', { text: 'Create post' }));
+      own.createB.addEventListener('click', function (e) {
+        if (e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        if (e.preventDefault) e.preventDefault();
+        openCreate();
+      });
       own.joinL = el('span', { text: 'Join' });
       own.joinB = el('button', { class: 'sg join', type: 'button', 'aria-pressed': 'false' }, own.joinL);
       own.moreB = el('button', { class: 'sg', type: 'button', 'aria-haspopup': 'menu', 'aria-label': 'More community actions', title: 'More' }, svg(IC.more));
       own.joinB.addEventListener('click', function () { toggleJoin(); });
       own.moreB.addEventListener('click', function () { openCommunityMenu(own.moreB); });
       own.left = el('div', { class: 'bl' }, own.createB, own.aboutB, own.flairB, own.joinB, own.moreB, own.fchip);
-      own.bar = el('div', { class: 'bar' }, own.left, own.center, own.sg);
+      own.bellN = el('span', { class: 'bn' });
+      own.bellN.style.display = 'none';
+      own.bellB = el('button', { class: 'sg bell', type: 'button', 'aria-label': 'Notifications', title: 'Notifications' }, svg(IC.bell), own.bellN);
+      own.bellB.addEventListener('click', function () { toggleNotif(); });
+      if (!cfg.notifs) own.bellB.style.display = 'none';
+      own.mutedB = el('button', { class: 'sg', type: 'button', 'aria-haspopup': 'menu', text: 'Muted (0)' });
+      own.mutedB.style.display = 'none';
+      own.mutedB.addEventListener('click', function () { openMutedMenu(own.mutedB); });
+      own.br = el('div', { class: 'br' }, own.bellB, own.mutedB, own.sg);
+      own.bar = el('div', { class: 'bar' }, own.left, own.center, own.br);
       own.sg.addEventListener('click', toggleSugg);
       own.root.appendChild(own.bar);
       own.root.appendChild(own.grid);
@@ -2452,6 +2853,8 @@
     if (!own.host.isConnected || own.host.parentNode !== f.parentNode) f.parentNode.insertBefore(own.host, f);
     own.host.setAttribute('data-theme', themeNow());
     updateSort();
+    updateMutedBtn();
+    refreshBell();
   }
 
   function pokeMore() {
@@ -3023,6 +3426,7 @@
     gm.menu('Lightbox: ' + (cfg.lightbox ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('lightbox', !cfg.lightbox); location.reload(); });
     gm.menu('Own cards: ' + (cfg.cards ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('cards', !cfg.cards); location.reload(); });
     gm.menu('Home button opens: ' + (cfg.homeSort === 'best' ? 'Reddit default (Best)' : 'Hot') + ' (click to switch and reload)', function () { gm.set('homeSort', cfg.homeSort === 'best' ? 'hot' : 'best'); location.reload(); });
+    gm.menu('Notifications dropdown: ' + (cfg.notifs ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('notifs', !cfg.notifs); location.reload(); });
     gm.menu('Left icon rail: ' + (cfg.rail ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('rail', !cfg.rail); location.reload(); });
     gm.menu('Copy diagnostics', function () {
       var t = diag();
@@ -3046,6 +3450,7 @@
     if (cfg.cards || cfg.rail) {
       (function loop() { tick(); setTimeout(loop, own.shown.length ? 800 : 250); })();
     }
+    if (cfg.notifs) document.addEventListener('click', onBellClick, true);
     if (cfg.lightbox) {
       document.addEventListener('click', onClick, true);
       window.addEventListener('keydown', onKey, true);
@@ -3057,7 +3462,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, railWanted: railWanted, hc: function () { return HC; }, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, nt: function () { return NT; }, cp: function () { return CP; }, openNotif: openNotif, closeNotif: closeNotif, onBellClick: onBellClick, markAllRead: markAllRead, openPermalink: openPermalink, setMuted: setMuted, isMuted: isMuted, openMutedMenu: openMutedMenu, updateMutedBtn: updateMutedBtn, openCreate: openCreate, submitCreate: submitCreate, ntTitle: ntTitle, ntPostPath: ntPostPath, railWanted: railWanted, hc: function () { return HC; }, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
