@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.14.1
+// @version      0.14.2
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -24,7 +24,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.14.1';
+  var VERSION = '0.14.2';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -626,23 +626,48 @@
   /* a plain link to Reddit's chat, Follow stays on Reddit's own page.   */
   /* ------------------------------------------------------------------ */
 
-  var HC = { data: {}, fol: {}, showT: 0, hideT: 0, cur: '', chat: 'not used yet' };
+  var HC = { data: {}, fol: {}, showT: 0, hideT: 0, cur: '', chat: 'not used yet', prime: 'not tried', primed: {}, primeMs: 3500 };
 
   /* Start chat: the same call Reddit's own chat link component makes (read from
      its code): the chat panel's openChatUrl with a path like /user/NAME. */
-  function openChatFor(e, path, fullUrl) {
-    if (e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-    var host = document.querySelector('reddit-chat-host');
-    if (!host || typeof host.openChatUrl !== 'function') {
-      HC.chat = 'chat panel not found, link left to open normally';
-      log('chat: ' + HC.chat);
-      return;
-    }
-    if (e.preventDefault) e.preventDefault();
+  /* Reddit's own Start chat loads the person's hover card first (a request to
+     /svc/shreddit/user-hover-card/NAME and a GraphQL call). Without that the
+     chat cannot resolve the name and redirects to an old pending invite, as
+     recordings of both routes showed. Do the same load with Reddit's own
+     partial loader, out of sight, before asking the chat to open. */
+  function primeUser(name) {
+    return new Promise(function (resolve) {
+      if (HC.primed[name]) { resolve('already loaded'); return; }
+      if (!/^[\w-]{1,32}$/.test(String(name)) || typeof customElements === 'undefined' || !customElements.get('faceplate-partial')) { resolve('skipped (no loader)'); return; }
+      var holder = document.createElement('div');
+      holder.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden';
+      holder.setAttribute('aria-hidden', 'true');
+      var p = document.createElement('faceplate-partial');
+      p.setAttribute('src', '/svc/shreddit/user-hover-card/' + encodeURIComponent(name));
+      p.setAttribute('loading', 'programmatic');
+      var done = false, t0 = Date.now(), timer = 0;
+      function finish(r) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (r === 'loaded') HC.primed[name] = 1;
+        try { if (holder.parentNode) holder.parentNode.removeChild(holder); } catch (x) { /* ignore */ }
+        resolve(r + ' in ' + (Date.now() - t0) + ' ms');
+      }
+      timer = setTimeout(function () { finish('timed out'); }, HC.primeMs);
+      p.addEventListener('faceplate-load', function () { finish('loaded'); });
+      p.addEventListener('faceplate-error', function () { finish('failed'); });
+      holder.appendChild(p);
+      document.body.appendChild(holder);
+      try { if (typeof p.load === 'function') p.load(); } catch (x) { finish('failed'); }
+    });
+  }
+
+  function callChat(host, kbd, path, fullUrl) {
     try {
       var wasStarted = !!host.hasChatClientActivated;
       host.openChatUrl(path);
-      HC.chat = 'called the chat panel with ' + String(path).replace(/^\/user\/.*/, '/user/<name>') + (wasStarted ? ' (panel already started)' : ' (panel was not started yet, will call again once it is)');
+      HC.chat = 'called the chat panel with ' + String(path).replace(/^\/user\/.*/, '/user/<name>') + (wasStarted ? ' (panel already started)' : ' (panel was not started yet, will call again once it is)') + ' | hover card: ' + HC.prime;
       log('chat: ' + HC.chat);
       /* A panel that has not started yet only remembers the address, and its
          auto-open invite wins at start-up. Once it is running the same call
@@ -663,7 +688,7 @@
           }
         }, 200);
       }
-      if (e.detail === 0 && host.updateComplete && host.updateComplete.then) {
+      if (kbd && host.updateComplete && host.updateComplete.then) {
         host.updateComplete.then(function () { try { if (host.setFocusOnChatWidget) host.setFocusOnChatWidget(); } catch (x) { /* ignore */ } });
       }
     } catch (er) {
@@ -671,6 +696,24 @@
       log('chat: the chat panel refused:', er);
       window.open(fullUrl, '_blank', 'noopener');
     }
+  }
+
+  function openChatFor(e, path, fullUrl) {
+    if (e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var host = document.querySelector('reddit-chat-host');
+    if (!host || typeof host.openChatUrl !== 'function') {
+      HC.chat = 'chat panel not found, link left to open normally';
+      log('chat: ' + HC.chat);
+      return;
+    }
+    if (e.preventDefault) e.preventDefault();
+    var kbd = e.detail === 0;
+    var name = '';
+    try { name = decodeURIComponent(String(path).replace(/^\/user\//, '')); } catch (x) { name = ''; }
+    primeUser(name).then(function (res) {
+      HC.prime = res;
+      callChat(host, kbd, path, fullUrl);
+    });
   }
 
   function userAbout(name) {
