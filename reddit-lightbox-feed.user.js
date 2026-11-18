@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.13.1
+// @version      0.14.0
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.13.1';
+  var VERSION = '0.14.0';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -187,7 +187,18 @@
   /* Settings and menu                                                  */
   /* ------------------------------------------------------------------ */
 
-  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true), extra: gm.get('extra', false), homeSort: gm.get('homeSort', 'hot'), notifs: gm.get('notifs', true) };
+  var cfg = { layout: gm.get('layout', true), lightbox: gm.get('lightbox', true), cards: gm.get('cards', true), rail: gm.get('rail', true), extra: gm.get('extra', false), homeSort: gm.get('homeSort', 'hot'), notifs: gm.get('notifs', true), font: gm.get('font', true) };
+
+  /* Lexend is used from the fonts installed on this PC (nothing is downloaded);
+     if it is not installed the normal fonts are used. */
+  var SYS_FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+  var FONT_STACK = cfg.font ? "'LBX Lexend','Lexend Medium','Lexend'," + SYS_FONT : SYS_FONT;
+  var FONT_CSS = [
+    "@font-face{font-family:'LBX Lexend';font-weight:100 500;font-style:normal;src:local('Lexend Medium'),local('Lexend-Medium'),local('Lexend Regular'),local('Lexend')}",
+    "@font-face{font-family:'LBX Lexend';font-weight:600 900;font-style:normal;src:local('Lexend SemiBold'),local('Lexend-SemiBold'),local('Lexend Bold'),local('Lexend-Bold'),local('Lexend Medium'),local('Lexend')}",
+    'html.lbx-font,html.lbx-font body,html.lbx-font *{font-family:' + FONT_STACK + ' !important}',
+    'html.lbx-font code,html.lbx-font pre,html.lbx-font kbd,html.lbx-font samp{font-family:ui-monospace,Menlo,Consolas,monospace !important}'
+  ].join('\n');
 
   /* ------------------------------------------------------------------ */
   /* Layout (CSS only, scoped to pages that contain a feed)             */
@@ -242,7 +253,7 @@
   /* ------------------------------------------------------------------ */
 
   var HC_CSS = [
-    '.hcard{position:fixed;z-index:60;width:292px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}',
+    '.hcard{position:fixed;z-index:60;width:292px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:14px;font:13px/1.45 ' + FONT_STACK + '}',
     '.hcard .hh{display:flex;gap:12px;align-items:center}',
     '.hcard .hav{width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:700;font-size:20px;color:#fff;overflow:hidden;background:var(--accent-bg)}',
     '.hcard .hav img{width:100%;height:100%;object-fit:cover;display:block}',
@@ -264,7 +275,7 @@
   ].join('\n');
 
   var LB_CSS = [
-    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--gold:#F6A800;--scrim:rgba(8,5,8,.72);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
+    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--gold:#F6A800;--scrim:rgba(8,5,8,.72);font:14px/1.5 ' + FONT_STACK + ';color:var(--fg)}',
     ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#1a8f3c;--down:#c62828;--scrim:rgba(30,15,25,.55)}',
     '*{box-sizing:border-box}',
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}',
@@ -1250,7 +1261,7 @@
   /* ------------------------------------------------------------------ */
 
   var TOK = [
-    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--gold:#F6A800;--gold-ink:#1f1519;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}',
+    ':host{all:initial;--surface:#1a1418;--surface2:#251c22;--line:#35293a;--fg:#f2ecf0;--muted:#a99ba3;--accent:#e0a3c8;--accent-bg:#532A45;--up:#3fb950;--down:#f85149;--gold:#F6A800;--gold-ink:#1f1519;font:14px/1.5 ' + FONT_STACK + ';color:var(--fg)}',
     ':host([data-theme="light"]){--surface:#fff;--surface2:#F0ECF0;--line:#D0C4CC;--fg:#1f1519;--muted:#5f525a;--accent:#532A45;--accent-bg:#ead9e3;--up:#1a8f3c;--down:#c62828}',
     '*{box-sizing:border-box}',
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}',
@@ -2510,27 +2521,29 @@
   /* Notifications dropdown, from the classic inbox                      */
   /* ------------------------------------------------------------------ */
 
-  var NT = { host: null, root: null, panel: null, list: null, sub: null, items: null, open: false, err: '' };
+  var NT = { host: null, root: null, panel: null, list: null, sub: null, note: null, items: null, open: false, err: '', retryMs: 4000 };
 
   var NCSS = TOK + [
-    '.np{width:min(400px,calc(100vw - 24px));max-height:min(72vh,640px);display:flex;flex-direction:column;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);outline:none;overflow:hidden}',
-    '.nh{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}',
+    '.np{width:min(470px,calc(100vw - 24px));max-height:min(72vh,640px);display:flex;flex-direction:column;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);outline:none;overflow:hidden}',
+    '.nh{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}',
+    '.nh b{font-size:17px}',
     '.sp3{flex:1}',
-    '.nsub{color:var(--muted);font-size:12px}',
-    '.nbtn{padding:4px 12px;border-radius:99px;border:1px solid var(--accent);background:var(--accent-bg);font-size:12px;font-weight:600}',
+    '.nsub{color:var(--muted);font-size:14px}',
+    '.nbtn{padding:6px 14px;border-radius:99px;border:1px solid var(--accent);background:var(--accent-bg);font-size:14px;font-weight:600}',
     '.nbtn:hover{background:var(--accent);color:var(--gold-ink)}',
     '.nx{width:28px;height:28px;border-radius:99px;display:grid;place-items:center;color:var(--muted)}',
     '.nlist{overflow:auto;display:flex;flex-direction:column}',
-    '.nit{display:flex;gap:10px;text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);width:100%;align-items:flex-start}',
+    '.nit{display:flex;gap:12px;text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);width:100%;align-items:flex-start}',
     '.nit:hover{background:var(--surface2)}',
     '.nit .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);margin-top:6px;flex:none;visibility:hidden}',
     '.nit.new .dot{visibility:visible}',
-    '.nit .nt{font-weight:600;font-size:13px;overflow-wrap:anywhere}',
-    '.nit .nb{color:var(--muted);font-size:12px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
-    '.nit .nw{color:var(--muted);font-size:11px;margin-top:2px}',
-    '.nmsg{padding:18px;color:var(--muted);text-align:center;font-size:13px}',
+    '.nit .nt{font-weight:600;font-size:16px;line-height:1.4;overflow-wrap:anywhere}',
+    '.nit .nb{color:var(--muted);font-size:15px;line-height:1.45;margin-top:2px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+    '.nit .nw{color:var(--muted);font-size:13px;margin-top:4px}',
+    '.nmsg{padding:14px 18px;color:var(--muted);text-align:center;font-size:15px}',
     '.nmsg.er{color:#ff9a9a}',
-    '.nf{display:block;padding:10px 14px;text-align:center;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;border-top:1px solid var(--line)}'
+    '.nmsg.info{color:var(--muted)}',
+    '.nf{display:block;padding:14px;text-align:center;color:var(--accent);font-size:15px;font-weight:600;text-decoration:none;border-top:1px solid var(--line)}'
   ].join('\n');
 
   function ntTitle(d) {
@@ -2605,12 +2618,37 @@
     });
   }
 
+  function ntNote(text, bad) {
+    if (!NT.note) return;
+    NT.note.textContent = text || '';
+    NT.note.className = 'nmsg ' + (bad ? 'er' : 'info');
+    NT.note.style.display = text ? '' : 'none';
+  }
+
+  /* Marks the unread items read by name. Reddit rate-limits the "read all"
+     call hard, so this uses the per-item call (many names in one request),
+     waits and tries once more if told to slow down, and puts the dots back
+     if it still does not work. */
   function markAllRead() {
-    (NT.items || []).forEach(function (d) { d.new = false; });
+    var unread = (NT.items || []).filter(function (d) { return d.new && d.name; });
+    if (!unread.length) { ntNote('Everything here is already read.', false); return; }
+    unread.forEach(function (d) { d.new = false; });
     renderNotif();
     setBell(0);
-    postApi('/api/read_all_messages', {}).catch(function (e) {
-      if (NT.list) setKids(NT.list, el('div', { class: 'nmsg er', text: 'Marking as read did not work: ' + String((e && e.message) || e) }));
+    var ids = unread.map(function (d) { return d.name; }).join(',');
+    function attempt(n) {
+      return postApi('/api/read_message', { id: ids }).catch(function (e) {
+        if (n === 0 && e && e.status === 429) {
+          ntNote('Reddit says slow down. Trying again in a few seconds...', false);
+          return new Promise(function (res) { setTimeout(res, NT.retryMs); }).then(function () { return attempt(1); });
+        }
+        throw e;
+      });
+    }
+    attempt(0).then(function () { ntNote('', false); }, function (e) {
+      unread.forEach(function (d) { d.new = true; });
+      renderNotif();
+      ntNote('Marking as read did not work: ' + String((e && e.message) || e), true);
     });
   }
 
@@ -2622,11 +2660,14 @@
     adopt(NT.root, NCSS);
     NT.sub = el('span', { class: 'nsub' });
     NT.list = el('div', { class: 'nlist' });
+    NT.note = el('div', { class: 'nmsg info', role: 'status' });
+    NT.note.style.display = 'none';
     var all = el('button', { class: 'nbtn', type: 'button', text: 'Mark all read' });
     all.addEventListener('click', markAllRead);
     NT.panel = el('section', { class: 'np', role: 'dialog', 'aria-label': 'Notifications', tabindex: '-1' },
       el('div', { class: 'nh' }, el('b', { text: 'Notifications' }), NT.sub, el('span', { class: 'sp3' }), all,
         el('button', { class: 'nx', type: 'button', 'aria-label': 'Close notifications', onclick: function () { closeNotif(); } }, svg(IC.x))),
+      NT.note,
       NT.list,
       el('a', { class: 'nf', href: '/notifications', target: '_blank', rel: 'noopener', text: 'See all notifications on Reddit' }));
     NT.root.appendChild(NT.panel);
@@ -3447,6 +3488,7 @@
     gm.menu('Own cards: ' + (cfg.cards ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('cards', !cfg.cards); location.reload(); });
     gm.menu('Home button opens: ' + (cfg.homeSort === 'best' ? 'Reddit default (Best)' : 'Hot') + ' (click to switch and reload)', function () { gm.set('homeSort', cfg.homeSort === 'best' ? 'hot' : 'best'); location.reload(); });
     gm.menu('Notifications dropdown: ' + (cfg.notifs ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('notifs', !cfg.notifs); location.reload(); });
+    gm.menu('Font Lexend (from this PC): ' + (cfg.font ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('font', !cfg.font); location.reload(); });
     gm.menu('Left icon rail: ' + (cfg.rail ? 'ON' : 'OFF') + ' (click to switch and reload)', function () { gm.set('rail', !cfg.rail); location.reload(); });
     gm.menu('Copy diagnostics', function () {
       var t = diag();
@@ -3458,6 +3500,7 @@
       if (gm.copy(t)) console.log('[lightbox] structure report copied to the clipboard (' + t.split('\n').length + ' lines)');
       else console.log(t);
     });
+    if (cfg.font) { docEl().classList.add('lbx-font'); gm.style(FONT_CSS); }
     if (cfg.layout) gm.style(LAYOUT_CSS);
     if (cfg.cards && cfg.layout) {
       docEl().classList.add('lbx-wait');
@@ -3482,7 +3525,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, nt: function () { return NT; }, cp: function () { return CP; }, openNotif: openNotif, closeNotif: closeNotif, onBellClick: onBellClick, markAllRead: markAllRead, openPermalink: openPermalink, setMuted: setMuted, isMuted: isMuted, openMutedMenu: openMutedMenu, updateMutedBtn: updateMutedBtn, openCreate: openCreate, submitCreate: submitCreate, ntTitle: ntTitle, ntPostPath: ntPostPath, railWanted: railWanted, hc: function () { return HC; }, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, fontStack: FONT_STACK, fontCss: FONT_CSS, ncss: NCSS, nt: function () { return NT; }, cp: function () { return CP; }, openNotif: openNotif, closeNotif: closeNotif, onBellClick: onBellClick, markAllRead: markAllRead, openPermalink: openPermalink, setMuted: setMuted, isMuted: isMuted, openMutedMenu: openMutedMenu, updateMutedBtn: updateMutedBtn, openCreate: openCreate, submitCreate: submitCreate, ntTitle: ntTitle, ntPostPath: ntPostPath, railWanted: railWanted, hc: function () { return HC; }, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
