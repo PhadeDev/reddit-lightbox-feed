@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.13.0
+// @version      0.13.1
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.13.0';
+  var VERSION = '0.13.1';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -559,9 +559,29 @@
     }
     if (e.preventDefault) e.preventDefault();
     try {
+      var wasStarted = !!host.hasChatClientActivated;
       host.openChatUrl(path);
-      HC.chat = 'called the chat panel with ' + String(path).replace(/^\/user\/.*/, '/user/<name>');
+      HC.chat = 'called the chat panel with ' + String(path).replace(/^\/user\/.*/, '/user/<name>') + (wasStarted ? ' (panel already started)' : ' (panel was not started yet, will call again once it is)');
       log('chat: ' + HC.chat);
+      /* A panel that has not started yet only remembers the address, and its
+         auto-open invite wins at start-up. Once it is running the same call
+         navigates properly, so call again then. */
+      if (!wasStarted) {
+        var tries = 0;
+        var iv = setInterval(function () {
+          var ready = false;
+          try {
+            var sr = host.getShadowRoot ? host.getShadowRoot() : null;
+            ready = !!(host.hasChatClientActivated && sr && sr.querySelector('rs-history'));
+          } catch (x) { ready = false; }
+          if (ready || ++tries > 30) {
+            clearInterval(iv);
+            if (ready) {
+              try { host.openChatUrl(path); HC.chat += ' | called again after the panel started'; log('chat: called the chat panel again after it started'); } catch (x2) { log('chat: second call failed:', x2); }
+            } else { HC.chat += ' | the panel never reported that it had started'; log('chat: the panel did not report starting'); }
+          }
+        }, 200);
+      }
       if (e.detail === 0 && host.updateComplete && host.updateComplete.then) {
         host.updateComplete.then(function () { try { if (host.setFocusOnChatWidget) host.setFocusOnChatWidget(); } catch (x) { /* ignore */ } });
       }
