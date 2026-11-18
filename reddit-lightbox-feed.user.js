@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.11.2
+// @version      0.11.3
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.11.2';
+  var VERSION = '0.11.3';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -569,24 +569,14 @@
     var pop = el('div', { class: 'hcard', role: 'dialog', 'aria-label': 'User details' });
     pop.style.display = 'none';
     rootNode.appendChild(pop);
+    /* Only record what happened to a Start chat click (for diagnostics). We do not
+       call Reddit's chat panel ourselves: a guessed call opened another person's old invite. */
     pop.addEventListener('click', function (e) {
       var t = e.target;
       var a = t && t.closest ? t.closest('a[data-testid="private-chat-button"]') : null;
-      if (!a || e.defaultPrevented || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-      var url = a.getAttribute('href');
-      if (e.preventDefault) e.preventDefault();
-      var host = document.querySelector('reddit-chat-host');
-      try {
-        if (host && typeof host.openChatUrl === 'function') {
-          host.openChatUrl(url);
-          HC.chat = 'Reddit\'s component did not take the click, asked the chat panel directly';
-          log('chat: asked the chat panel to open');
-          return;
-        }
-      } catch (er) { log('chat: the chat panel refused:', er); }
-      HC.chat = 'opened the chat page in a new tab';
-      log('chat: opening the chat page in a new tab');
-      window.open(url, '_blank', 'noopener');
+      if (!a) return;
+      HC.chat = (HC.chat || '').split(' | ')[0] + ' | last click: ' + (e.defaultPrevented ? 'Reddit\'s component took it' : 'Reddit\'s component did not take it (link opens normally)');
+      log('chat:', HC.chat);
     });
 
     function hideNow() { clearTimeout(HC.showT); pop.style.display = 'none'; HC.cur = ''; }
@@ -3055,7 +3045,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ago: ago, fmt: fmt, pathOf: pathOf, safeHref: safeHref, hashStr: hashStr, wantsLightbox: wantsLightbox, structureReport: structureReport,
       _test: { build: build, renderPost: renderPost, renderError: renderError, ui: function () { return ui; },
-        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, railWanted: railWanted, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
+        own: own, rail: rail, S: S, newComment: newComment, postActions: postActions, railWanted: railWanted, hc: function () { return HC; }, homeHref: homeHref, detectSort: detectSort, layoutRows: layoutRows, toggleJoin: toggleJoin, refreshJoin: refreshJoin, openCommunityMenu: openCommunityMenu, scanFeed: scanFeed, domPost: domPost, useMineCache: useMineCache, saveMineCache: saveMineCache, getMe: getMe, loadSaved: loadSaved, loadVotes: loadVotes, markVotes: markVotes, markSaved: markSaved, paintCard: paintCard, openAbout: openAbout, closeAbout: closeAbout, openFlairs: openFlairs, widgetBlocks: widgetBlocks, currentFlair: currentFlair, flairHref: flairHref, doHide: doHide, doSave: doSave, doUnhide: doUnhide, openMenu: openMenu, closeMenu: closeMenu, prefetch: prefetch, ACT: ACT, postApi: postApi, composer: composer, commentNode: commentNode, userAbout: userAbout, redditorFor: redditorFor, updateSort: updateSort, sortInfo: sortInfo, openZoom: openZoom, closeZoom: closeZoom, zoomOpen: zoomOpen, onKey: onKey, toggleSugg: toggleSugg, cardEl: cardEl, thumbFor: thumbFor, snippetOf: snippetOf, ensureRail: ensureRail,
         renderRail: renderRail, toggleRail: toggleRail, setCfg: function (k, v) { cfg[k] = v; }, onOwnClick: onOwnClick, onOwnKey: onOwnKey, loadSubs: loadSubs, step: step, close: close } };
     return;
   }
