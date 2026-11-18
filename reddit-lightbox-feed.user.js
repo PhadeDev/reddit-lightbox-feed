@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.12.1
+// @version      0.12.2
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.12.1';
+  var VERSION = '0.12.2';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -279,7 +279,7 @@
     '.sp{flex:1}',
     '.hint{font-size:12px;color:var(--muted);margin-right:6px}',
     '.pane{overflow:auto;padding:20px 22px 28px;min-width:0}',
-    '.acts.stick{position:sticky;top:0;z-index:4;margin:0 -22px;padding:8px 22px;background:var(--surface);border-top:0;border-bottom:1px solid var(--line)}',
+    '.acts.stick{position:sticky;top:-20px;z-index:4;margin:0 -22px;padding:8px 22px;background:var(--surface);border-top:0;border-bottom:1px solid var(--line)}',
     '.post{border-right:1px solid var(--line);display:flex;flex-direction:column;gap:12px}',
     'h2{margin:0;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-.01em;text-wrap:balance;overflow-wrap:anywhere}',
     '.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--muted)}',
