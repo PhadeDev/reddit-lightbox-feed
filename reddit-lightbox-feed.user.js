@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reddit Lightbox Feed
 // @namespace    https://github.com/PhadeDev/reddit-lightbox-feed
-// @version      0.14.2
+// @version      0.14.3
 // @description  A denser Reddit feed layout, and posts that open in a lightbox with their comments so you never leave the page.
 // @author       PhadeDev
 // @match        https://www.reddit.com/*
@@ -24,7 +24,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.14.2';
+  var VERSION = '0.14.3';
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -667,7 +667,7 @@
     try {
       var wasStarted = !!host.hasChatClientActivated;
       host.openChatUrl(path);
-      HC.chat = 'called the chat panel with ' + String(path).replace(/^\/user\/.*/, '/user/<name>') + (wasStarted ? ' (panel already started)' : ' (panel was not started yet, will call again once it is)') + ' | hover card: ' + HC.prime;
+      HC.chat = 'called the chat panel with ' + String(path).replace(/^\/user\/.*/, '/user/<name>') + (wasStarted ? ' (panel already started)' : ' (panel was not started yet, will call again once it is)') + ' | path ok: ' + /^\/user\/[\w-]{1,32}$/.test(String(path)) + ' (length ' + String(path).length + ') | hover card: ' + HC.prime;
       log('chat: ' + HC.chat);
       /* A panel that has not started yet only remembers the address, and its
          auto-open invite wins at start-up. Once it is running the same call
@@ -815,6 +815,13 @@
         var chatNode = chatA;
         actions.push(chatNode);
         actions.push(el('a', { class: 'hb', href: '/user/' + enc + '/', text: 'View profile' }));
+        var copyB = el('button', { class: 'hb', type: 'button', title: 'Copy the username, to paste into Reddit\'s New chat box', text: 'Copy name' });
+        copyB.addEventListener('click', function () {
+          if (!gm.copy(name) && typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(name).catch(function () { /* ignore */ });
+          copyB.textContent = 'Copied';
+          setTimeout(function () { copyB.textContent = 'Copy name'; }, 1800);
+        });
+        actions.push(copyB);
       }
       kids.push(el('div', { class: 'ha' }, actions));
       kids.push(msg);
